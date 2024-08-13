@@ -1,0 +1,109 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        max_recv_msg_size_mib: 999999999
+      http:
+        endpoint: 0.0.0.0:4318
+  k8s_events:
+    auth_type: serviceAccount
+    namespaces: [all]
+processors:
+  batch:
+    send_batch_size: 10000
+    timeout: 2s
+  metadata:
+    # 需要填充K8s信息的指标前缀
+    metric_prefix: "kindling_"
+    # k8s数据源
+    kube_source:
+      # kube_auth_type, support serviceAccount and kubeConfig, default is serviceAccount
+      kube_auth_type: serviceAccount
+      # kube_auth_config, kubeConfig file path, only used when kube_auth_type is kubeConfig
+      kube_auth_config: ~/.kube/config
+      # cluster_id, setup cluster id in kube metadata
+      cluster_id: ""
+    exporter:
+      # remote_write_addr, push kube metadata to other server, remove if not need
+      remote_write_addr: apo-backend-svc:8080/metadata
+      # fetch_server_port, allowed other client fetch from this port, remove if not need
+      fetch_server_port: 8080
+exporters:
+  debug:
+    verbosity: basic
+    sampling_initial: 5
+    sampling_thereafter: 200
+  otlp:
+    endpoint: http://apo-jaeger-collector-nodeport-svc:4317
+    tls:
+      insecure: true
+  otlphttp:
+    endpoint: localhost:4317
+  prometheus:
+    endpoint: localhost:9500
+  otlphttp/victoriametrics:
+    compression: gzip
+    encoding: proto
+    endpoint: http://apo-victoria-metrics-single-server-svc:8428/opentelemetry
+    tls:
+      insecure: true
+  clickhouse/logs:
+    endpoint: tcp://apo-clickhouse:9000?dial_timeout=10s&compress=lz4
+    username: admin
+    password: Apo@123456
+    database: apo
+    ttl: 72h
+    create_schema: true
+    logs_table_name: ilogtail_logs
+    traces_table_name: otel_traces
+    metrics_table_name: otel_metrics
+    timeout: 5s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+  clickhouse/k8sevent:
+    endpoint: tcp://apo-clickhouse:9000?dial_timeout=10s&compress=lz4
+    username: admin
+    password: Apo@123456
+    database: apo
+    ttl: 720h
+    create_schema: true
+    logs_table_name: k8s_events
+    traces_table_name: otel_traces
+    metrics_table_name: otel_metrics
+    timeout: 5s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    # cluster_name: my_cluster
+    # table_engine:
+    #   name: ReplicatedMergeTree
+    #   params:
+service:
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: none
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp]
+    metrics:
+      receivers: [otlp]
+      processors: [batch, metadata]
+      exporters: [otlphttp/victoriametrics]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [clickhouse/logs]
+    logs/k8sevent:
+      receivers: [k8s_events]
+      processors: [batch]
+      exporters: [clickhouse/k8sevent]

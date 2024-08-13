@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apo-otel-collector
+  namespace: apo
+spec:
+  selector:
+    matchLabels:
+      app: apo-otel-collector
+  template:
+    metadata:
+      labels:
+        app: apo-otel-collector
+    spec:
+      volumes:
+      - name: collector-conf
+        configMap:
+          name: collector-config
+      containers:
+      - name: otel-collector
+        image: apo-otel-collector:latest
+        volumeMounts:
+        - name: collector-conf
+          mountPath: /app/conf
+
+
+

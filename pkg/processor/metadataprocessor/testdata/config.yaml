@@ -1,0 +1,4 @@
+kube_source:
+  kube_auth_type: serviceAccount
+exporter:
+  remote_write_addr: localhost:8080
