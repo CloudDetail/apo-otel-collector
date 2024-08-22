@@ -47,8 +47,7 @@ jobs:
         OSS_BUCKET: apo-oss
         OSS_ENDPOINT: https://oss-cn-hangzhou.aliyuncs.com/
       run: |
-        Invoke-WebRequest -Uri "https://gosspublic.alicdn.com/ossutil/1.7.19/ossutil-v1.7.19-windows-386.zip" -OutFile "ossutil.zip"
+        Invoke-WebRequest -Uri "https://gosspublic.alicdn.com/ossutil/1.7.19/ossutil-v1.7.19-windows-amd64.zip" -OutFile "ossutil.zip"
         Expand-Archive -Path "ossutil.zip" -DestinationPath "ossutil"
-        .\ossutil\ossutil.exe config -e $env:OSS_ENDPOINT -i $env:OSS_ACCESS_KEY_ID -k $env:OSS_ACCESS_KEY_SECRET -c C:\\Users\user\.ossutilconfig
-        .\ossutil\ossutil.exe cp otelcol.zip oss://$env:OSS_BUCKET/otelcol-windows-amd64-${{ env.APP_VERSION }}.zip
-      
+        .\ossutil\ossutil-v1.7.19-windows-amd64\ossutil64.exe config -e $env:OSS_ENDPOINT -i $env:OSS_ACCESS_KEY_ID -k $env:OSS_ACCESS_KEY_SECRET -c C:\\Users\user\.ossutilconfig
+        .\ossutil\ossutil-v1.7.19-windows-amd64\ossutil64.exe oss://$env:OSS_BUCKET/otelcol-windows-amd64-${{ env.APP_VERSION }}.zip      
