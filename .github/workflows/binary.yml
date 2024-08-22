@@ -22,10 +22,8 @@ jobs:
       run: |
         Set-ExecutionPolicy Bypass -Scope Process -Force; 
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; 
-        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-  
-    - name: Install Make
-      run: choco install make
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'));
+        choco install make
   
     - name: Get Git Tag
       run: |
@@ -33,10 +31,8 @@ jobs:
         echo "APP_VERSION=$tag" >> $env:GITHUB_ENV
   
     - name: Build the executable
-      run: make otelcol
-  
-    - name: Archive the executable
       run: |
+        make otelcol
         rename-Item otelcol -NewName otelcol.exe
         Compress-Archive -Path otelcol.exe -DestinationPath otelcol.zip
 
@@ -49,5 +45,5 @@ jobs:
       run: |
         Invoke-WebRequest -Uri "https://gosspublic.alicdn.com/ossutil/1.7.19/ossutil-v1.7.19-windows-amd64.zip" -OutFile "ossutil.zip"
         Expand-Archive -Path "ossutil.zip" -DestinationPath "ossutil"
-        .\ossutil\ossutil-v1.7.19-windows-amd64\ossutil64.exe config -e $env:OSS_ENDPOINT -i $env:OSS_ACCESS_KEY_ID -k $env:OSS_ACCESS_KEY_SECRET -c C:\\Users\administrator\.ossutilconfig
+        .\ossutil\ossutil-v1.7.19-windows-amd64\ossutil64.exe config -e $env:OSS_ENDPOINT -i $env:OSS_ACCESS_KEY_ID -k $env:OSS_ACCESS_KEY_SECRET -c C:\\Users\runneradmin\.ossutilconfig
         .\ossutil\ossutil-v1.7.19-windows-amd64\ossutil64.exe cp otelcol.zip oss://$env:OSS_BUCKET/otelcol-windows-amd64-${{ env.APP_VERSION }}.zip      
