@@ -9,6 +9,12 @@ receivers:
   k8s_events:
     auth_type: serviceAccount
     namespaces: [all]
+  skywalking:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:11800 # 接收 SkyWalking Agent 上报的 Trace 数据
+      http:
+        endpoint: 0.0.0.0:12800 # 接收从前端/ nginx 等 HTTP 协议上报的 Trace 数据
 processors:
   batch:
     send_batch_size: 10000
@@ -30,6 +36,7 @@ processors:
       # fetch_server_port, allowed other client fetch from this port, remove if not need
       fetch_server_port: 8080
 exporters:
+  nop:
   debug:
     verbosity: basic
     sampling_initial: 5
@@ -80,10 +87,10 @@ exporters:
       initial_interval: 5s
       max_interval: 30s
       max_elapsed_time: 300s
-    # cluster_name: my_cluster
-    # table_engine:
-    #   name: ReplicatedMergeTree
-    #   params:
+      # cluster_name: my_cluster
+      # table_engine:
+      #   name: ReplicatedMergeTree
+      #   params:
 service:
   telemetry:
     logs:
@@ -92,13 +99,17 @@ service:
       level: none
   pipelines:
     traces:
-      receivers: [otlp]
+      receivers: [otlp, skywalking]
       processors: [batch]
       exporters: [otlp]
     metrics:
       receivers: [otlp]
       processors: [batch, metadata]
       exporters: [otlphttp/victoriametrics]
+    metrics/sw:
+      receivers: [skywalking]
+      processors: []
+      exporters: [nop]
     logs:
       receivers: [otlp]
       processors: [batch]
