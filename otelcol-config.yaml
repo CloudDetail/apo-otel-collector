@@ -35,6 +35,20 @@ processors:
       remote_write_addr: apo-backend-svc:8080/metadata
       # fetch_server_port, allowed other client fetch from this port, remove if not need
       fetch_server_port: 8080
+connectors:
+  redmetrics:
+    # 开启服务端RED指标生成
+    server_enabled: true
+    # 开启DB RED指标生成
+    db_enabled: true
+    # RED Key缓存的数量，超过则清理；用于清理已失效PID数据.
+    dimensions_cache_size: 1000
+    # 指标发送时间（秒）
+    metrics_flush_interval: 60
+    # 最大监控服务数，超过则将服务名打标为 overflow_service.
+    max_services_to_track: 256
+    # 每个服务下最大URL数，超过则将URL打标为 overflow_operation.
+    max_operations_to_track_per_service: 2048
 exporters:
   nop:
   debug:
@@ -102,8 +116,12 @@ service:
       receivers: [otlp, skywalking]
       processors: [batch]
       exporters: [otlp]
-    metrics:
+    traces/red:
       receivers: [otlp]
+      processors: [batch]
+      exporters: [redmetrics]
+    metrics:
+      receivers: [otlp, redmetrics]
       processors: [batch, metadata]
       exporters: [otlphttp/victoriametrics]
     metrics/sw:

@@ -5,6 +5,7 @@ module github.com/CloudDetail/apo-otel-collector
 go 1.21.0
 
 require (
+	github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor v0.0.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.103.0
@@ -177,6 +178,7 @@ require (
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/spf13/cobra v1.8.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/tilinna/clock v1.1.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/vultr/govultr/v2 v2.17.2 // indirect
@@ -252,5 +254,7 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 	skywalking.apache.org/repo/goapi v0.0.0-20240104145220-ba7202308dd4 // indirect
 )
+
+replace github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector => ./pkg/connector/redmetricsconnector
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor => ./pkg/processor/metadataprocessor

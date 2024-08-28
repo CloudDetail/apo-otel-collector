@@ -23,5 +23,9 @@ processors:
 - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.103.0
 - gomod: github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor v0.0.0
 
+connectors:
+- gomod: github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector
+
 replaces:
 - github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor => ../pkg/processor/metadataprocessor
+- github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector => ../pkg/connector/redmetricsconnector

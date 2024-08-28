@@ -13,6 +13,9 @@
 - [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/memorylimiterprocessor)
 - [metadataprocessor](./pkg/processor/metadataprocessor)
 
+### Connectors
+- [redmetricsconnector](./pkg/connector/redmetricsconnector)
+
 ### Exporters
 - [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/debugexporter)
 - [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlpexporter)
@@ -59,4 +62,26 @@ processors:
       remote_write_addr: localhost:8080
       # fetch_server_port, allowed other client fetch from this port, remove if not need
       fetch_server_port: 80
+```
+
+## Redmetricsconnector
+基于SpanMetrics进行二次开发，分桶数据基于ViectoryMetric的histogram库进行计算。
+最终生成 服务端RED指标 和 DB调用的RED指标
+
+配置文件示例:
+```yaml
+connectors:
+  redmetrics:
+    # 开启服务端RED指标生成
+    server_enabled: true
+    # 开启DB RED指标生成
+    db_enabled: true
+    # RED Key缓存的数量，超过则清理；用于清理已失效PID数据.
+    dimensions_cache_size: 1000
+    # 指标发送时间（秒）
+    metrics_flush_interval: 60
+    # 最大监控服务数，超过则将服务名打标为 overflow_service.
+    max_services_to_track: 256
+    # 每个服务下最大URL数，超过则将URL打标为 overflow_operation.
+    max_operations_to_track_per_service: 2048
 ```

@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/collector/otelcol"
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/collector/receiver"
+	redmetricsconnector "github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector"
 	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"
 	otlpexporter "go.opentelemetry.io/collector/exporter/otlpexporter"
@@ -68,6 +69,7 @@ func components() (otelcol.Factories, error) {
 	}
 
 	factories.Connectors, err = connector.MakeFactoryMap(
+		redmetricsconnector.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
