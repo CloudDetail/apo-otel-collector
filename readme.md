@@ -78,8 +78,8 @@ connectors:
     db_enabled: true
     # RED Key缓存的数量，超过则清理；用于清理已失效PID数据.
     dimensions_cache_size: 1000
-    # 指标发送时间（秒）
-    metrics_flush_interval: 60
+    # 指标发送间隔
+    metrics_flush_interval: 60s
     # 最大监控服务数，超过则将服务名打标为 overflow_service.
     max_services_to_track: 256
     # 每个服务下最大URL数，超过则将URL打标为 overflow_operation.

@@ -183,6 +183,10 @@ func (p *connectorImp) exportMetrics(ctx context.Context) {
 // buildMetrics collects the computed raw metrics data, builds the metrics object and
 // writes the raw metrics data into the metrics object.
 func (p *connectorImp) buildMetrics() (pmetric.Metrics, error) {
+	if len(p.serverHistograms)+len(p.dbCallHistograms) == 0 {
+		return pmetric.Metrics{}, nil
+	}
+
 	m := pmetric.NewMetrics()
 	ilm := m.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
 	ilm.Scope().SetName("redmetricsconnector")
