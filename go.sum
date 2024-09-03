@@ -68,6 +68,8 @@ github.com/ClickHouse/clickhouse-go/v2 v2.23.0 h1:srmRrkS0BR8gEut87u8jpcZ7geOob6
 github.com/ClickHouse/clickhouse-go/v2 v2.23.0/go.mod h1:tBhdF3f3RdP7sS59+oBAtTyhWpy0024ZxDMhgxra0QE=
 github.com/CloudDetail/metadata v0.0.0-20240809080233-394951895115 h1:6O9/rBmqa5Ig1n0xFTOqKoYT/7aGkzs2OYUmCr5PMg4=
 github.com/CloudDetail/metadata v0.0.0-20240809080233-394951895115/go.mod h1:YpCyr1yI2rybhXMo7STmU7qVvkRp6EDVaDRnU9Wf8ls=
+github.com/CloudDetail/metadata v0.0.0-20240903055919-f0487c96aa95 h1:52seV0rUftzIronLQOHOHbnlz4YHS4/dAB9rSHa+24M=
+github.com/CloudDetail/metadata v0.0.0-20240903055919-f0487c96aa95/go.mod h1:YpCyr1yI2rybhXMo7STmU7qVvkRp6EDVaDRnU9Wf8ls=
 github.com/Code-Hex/go-generics-cache v1.3.1 h1:i8rLwyhoyhaerr7JpjtYjJZUcCbWOdiYO3fZXLiEC4g=
 github.com/Code-Hex/go-generics-cache v1.3.1/go.mod h1:qxcC9kRVrct9rHeiYpFWSoW1vxyillCVzX13KZG8dl4=
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
