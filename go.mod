@@ -255,6 +255,6 @@ require (
 	skywalking.apache.org/repo/goapi v0.0.0-20240104145220-ba7202308dd4 // indirect
 )
 
-replace github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector => ./pkg/connector/redmetricsconnector
-
 replace github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor => ./pkg/processor/metadataprocessor
+
+replace github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector => ./pkg/connector/redmetricsconnector
