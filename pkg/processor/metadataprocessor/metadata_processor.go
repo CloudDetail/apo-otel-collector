@@ -90,7 +90,7 @@ func (mp *metadataProcessor) FillWithK8sMetadata(ctx context.Context, metric pme
 
 func (*metadataProcessor) fillPodInfo(attrs pcommon.Map) {
 	containerId, find := attrs.Get("container_id")
-	if !find {
+	if !find || containerId.Str() == "" {
 		return
 	}
 	pod, find := cache.Querier.GetPodByContainerId("", containerId.Str())
