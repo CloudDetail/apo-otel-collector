@@ -1,4 +1,4 @@
-module github.com/CloudDetail/apo-otel-collector/receiver/skywalkingreceiver
+module github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver
 
 go 1.21.0
 
