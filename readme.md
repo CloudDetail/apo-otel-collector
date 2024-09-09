@@ -4,7 +4,8 @@
 
 ## Components
 ### Receivers
-- [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
+- [otlpreceiver](./pkg/receiver/otlpreceiver)
+- [skywalkingreceiver](./pkg/receiver/skywalkingreceiver)
 - [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)
 - [k8seventsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8seventsreceiver)
 
@@ -91,7 +92,7 @@ connectors:
 
 ## FillProcExtension
 FillProcExtension插件 基于Peer信息获取PID 和 ContainerId信息
-在原SkywalkingReceiver 基础上增加PID、ContainerId信息
+在原SkywalkingReceiver、OtelRecevier 基础上增加PID、ContainerId信息
 
 配置示例
 ```yaml
@@ -107,9 +108,17 @@ receivers:
         endpoint: 0.0.0.0:11800
       http: 
         endpoint: 0.0.0.0:12800
+  otlp:
+    fillproc_extension: fill_proc
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        max_recv_msg_size_mib: 999999999
+      http:
+        endpoint: 0.0.0.0:4318
 service:
   extensions: [fill_proc]
   pipelines:
     traces:
-      receivers: [skywalking]
+      receivers: [skywalking, otlp]
 ```

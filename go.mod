@@ -10,6 +10,7 @@ require (
 	github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor v0.0.0
+	github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver v0.0.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.103.0
@@ -38,7 +39,6 @@ require (
 	go.opentelemetry.io/collector/processor/batchprocessor v0.103.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.103.0
 	go.opentelemetry.io/collector/receiver v0.103.0
-	go.opentelemetry.io/collector/receiver/otlpreceiver v0.103.0
 	golang.org/x/sys v0.21.0
 )
 
@@ -272,5 +272,7 @@ replace github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnec
 replace github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension => ./pkg/extension/fillprocextension
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor => ./pkg/processor/metadataprocessor
+
+replace github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver => ./pkg/receiver/otlpreceiver
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver => ./pkg/receiver/skywalkingreceiver

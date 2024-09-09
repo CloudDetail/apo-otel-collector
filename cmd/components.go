@@ -23,9 +23,9 @@ import (
 	metadataprocessor "github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor"
 	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor"
 	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"
-	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
 	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
+	otlpreceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver"
 	skywalkingreceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver"
 )
 
@@ -41,9 +41,9 @@ func components() (otelcol.Factories, error) {
 	}
 
 	factories.Receivers, err = receiver.MakeFactoryMap(
-		otlpreceiver.NewFactory(),
 		prometheusreceiver.NewFactory(),
 		k8seventsreceiver.NewFactory(),
+		otlpreceiver.NewFactory(),
 		skywalkingreceiver.NewFactory(),
 	)
 	if err != nil {
