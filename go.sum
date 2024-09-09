@@ -49,8 +49,8 @@ github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4 v4.3
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4 v4.3.0/go.mod h1:Y/HgrePTmGy9HjdSGTqZNa+apUpTVIEVKXJyARP2lrk=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.1.1 h1:7CBQ+Ei8SP2c6ydQTGCCrS35bDxgTMfoP2miAwK++OU=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.1.1/go.mod h1:c/wcGeGx5FUPbM/JltUYHZcKmigwyVLJlDq+4HdtXaw=
-github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 h1:UQHMgLO+TxOElx5B5HZ4hJQsoJ/PvUvKRhJHDQXO8P8=
-github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
+github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 h1:L/gRVlceqvL25UVaW/CKtUDjefjrs0SPonmDGUVOYP0=
+github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/Azure/go-autorest v14.2.0+incompatible/go.mod h1:r+4oMnoxhatjLLJ6zxSWATqVooLgysK6ZNox3g/xq24=
 github.com/Azure/go-autorest/autorest v0.11.12/go.mod h1:eipySxLmqSyC5s5k1CLupqet0PSENBEDP93LQ9a8QYw=
 github.com/Azure/go-autorest/autorest/adal v0.9.5/go.mod h1:B7KF7jKIeC9Mct5spmyCB/A8CG/sEz1vwIRGv/bbw7A=
@@ -71,8 +71,8 @@ github.com/CloudDetail/metadata v0.0.0-20240903055919-f0487c96aa95/go.mod h1:YpC
 github.com/Code-Hex/go-generics-cache v1.3.1 h1:i8rLwyhoyhaerr7JpjtYjJZUcCbWOdiYO3fZXLiEC4g=
 github.com/Code-Hex/go-generics-cache v1.3.1/go.mod h1:qxcC9kRVrct9rHeiYpFWSoW1vxyillCVzX13KZG8dl4=
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
-github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
-github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
+github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
+github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/Microsoft/hcsshim v0.11.4 h1:68vKo2VN8DE9AdN4tnkWnmdhqdbpUFM8OF3Airm7fz8=
 github.com/Microsoft/hcsshim v0.11.4/go.mod h1:smjE4dvqPX9Zldna+t5FG3rnoHhaB7QYxPRqGcpAD9w=
 github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46/go.mod h1:3wb06e3pkSAbeQ52E9H9iFoQsEEwGN64994WTCIhntQ=
@@ -551,8 +551,12 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal 
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.103.0/go.mod h1:arqw5KwD4HBC3PZeqsLqMWPmnkaOcrrW5bMndHwNyO4=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.103.0 h1:MZuxGGLUIMbErgwUeT9yqFXrsMYveGoPjck9OxHtT0A=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.103.0/go.mod h1:VS66oUydCMwiWl1BFmLs7iNy4lGsfVYsriXr/d1fpAk=
+github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8stest v0.103.0 h1:vSHoHLveqT9NULaIdIbfPgEvJ0e+UkBitb3dnawmunc=
+github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8stest v0.103.0/go.mod h1:hCzgpzXbUUDUlETMDKYOpPaOhPjR9T6M3W3nAW5cGX4=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.103.0 h1:j53/hdxxE6qphxI7S4ybo22/mT/0kDktWLgdwV5pB/Y=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.103.0/go.mod h1:3GFvGay9sySyHLAFlkkV1N+fUNvHz5LcN8/gPFBzEYw=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatatest v0.103.0 h1:XYkQCe4UPFy7qmBs1zhknhe1wzPnAff4Rb4WtnD8aAQ=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatatest v0.103.0/go.mod h1:hmeKPJaZjzOjcndDxpWnjt0781EMqvj3or01baNVoRI=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.103.0 h1:1cZyMMLSpSWFdfITyVc9Bb+8rn175/GGwtWZQ3nClpc=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.103.0/go.mod h1:o8BPP4DM2SkdkPJxJOdmgxKz5DftGcuyUXgqf5MoWAw=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry v0.103.0 h1:imXTMt9ravkIqcvvow0ya3aQh64OOiQpMOyWeG/SLDQ=
@@ -563,6 +567,10 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometh
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheusremotewrite v0.103.0/go.mod h1:+3rCl7Z3Zm4ZZOyX9lMmaAoN8NeeCXUOmR/tysR631g=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/skywalking v0.103.0 h1:f1SRlZcPVXj6ldGcvggoeqEmwlIS6yWYgfYClNTEoT4=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/skywalking v0.103.0/go.mod h1:9Ci62BenVFIRgG2X2BD7fej70dizZ/3bnLhyN/nq+oI=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.103.0 h1:v19lfgrsflmimm0LGOZoB51eNO0305Yud6LCnhS7LPY=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.103.0/go.mod h1:Z8OvUd7UJJpyXT2O5ma8QT42NfkP/7Q0l1oxStJ/5MY=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.103.0 h1:Gg2j3yN2iCQYwK+464RyVvmX+QyjjdXL3JpG+6BfDAQ=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.103.0/go.mod h1:4nxV+BIA4LLyjhFeuUuLlY7iza+PyySjKz4PfL44SRQ=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.103.0 h1:od5Gf6aVuh9qzfngtBK2hz2u0GmUFncXFJjt+ovhFSg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.103.0/go.mod h1:5RY2vbjH6bRSuu5fSiHLh70P/TtsrCCGy9Hhhl6Ge7g=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.103.0 h1:V1N1X+KbjMauQsqW99vOfwTWBmdDGHafyoCN2LVtro4=

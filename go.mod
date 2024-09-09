@@ -9,6 +9,8 @@ require (
 	github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor v0.0.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.103.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.103.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/skywalkingreceiver v0.103.0
@@ -49,7 +51,7 @@ require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.23.0 // indirect
 	github.com/CloudDetail/metadata v0.0.0-20240903055919-f0487c96aa95 // indirect
 	github.com/Code-Hex/go-generics-cache v1.3.1 // indirect
-	github.com/Microsoft/go-winio v0.6.1 // indirect
+	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/alecthomas/units v0.0.0-20231202071711-9a357b53e9c9 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect

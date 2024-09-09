@@ -3,35 +3,36 @@
 package main
 
 import (
+	redmetricsconnector "github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector"
+	metadataprocessor "github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor"
+	clickhouseexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter"
+	prometheusexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter"
+	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor"
+	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"
+	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
+	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
+	skywalkingreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/skywalkingreceiver"
 	"go.opentelemetry.io/collector/connector"
 	"go.opentelemetry.io/collector/exporter"
+	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"
+	loggingexporter "go.opentelemetry.io/collector/exporter/loggingexporter"
+	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
+	otlpexporter "go.opentelemetry.io/collector/exporter/otlpexporter"
+	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 	"go.opentelemetry.io/collector/extension"
 	"go.opentelemetry.io/collector/otelcol"
 	"go.opentelemetry.io/collector/processor"
-	"go.opentelemetry.io/collector/receiver"
-	redmetricsconnector "github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector"
-	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
-	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"
-	otlpexporter "go.opentelemetry.io/collector/exporter/otlpexporter"
-	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
-	loggingexporter "go.opentelemetry.io/collector/exporter/loggingexporter"
-	clickhouseexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter"
-	prometheusexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter"
 	batchprocessor "go.opentelemetry.io/collector/processor/batchprocessor"
 	memorylimiterprocessor "go.opentelemetry.io/collector/processor/memorylimiterprocessor"
-	metadataprocessor "github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor"
+	"go.opentelemetry.io/collector/receiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
-	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
-	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
-	skywalkingreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/skywalkingreceiver"
 )
 
 func components() (otelcol.Factories, error) {
 	var err error
 	factories := otelcol.Factories{}
 
-	factories.Extensions, err = extension.MakeFactoryMap(
-	)
+	factories.Extensions, err = extension.MakeFactoryMap()
 	if err != nil {
 		return otelcol.Factories{}, err
 	}
@@ -63,6 +64,8 @@ func components() (otelcol.Factories, error) {
 		batchprocessor.NewFactory(),
 		memorylimiterprocessor.NewFactory(),
 		metadataprocessor.NewFactory(),
+		k8sattributesprocessor.NewFactory(),
+		resourceprocessor.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
