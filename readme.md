@@ -91,6 +91,7 @@ connectors:
 
 ## FillProcExtension
 FillProcExtension插件 基于Peer信息获取PID 和 ContainerId信息
+在原SkywalkingReceiver 基础上增加PID、ContainerId信息
 
 配置示例
 ```yaml
@@ -98,6 +99,17 @@ extensions:
   fill_proc:
     enable: true
     interval: 5s
+receivers:
+  skywalking:
+    fillproc_extension: fill_proc
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:11800
+      http: 
+        endpoint: 0.0.0.0:12800
 service:
   extensions: [fill_proc]
+  pipelines:
+    traces:
+      receivers: [skywalking]
 ```

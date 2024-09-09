@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector/internal/cache"
+	"github.com/CloudDetail/apo-otel-collector/pkg/fillproc"
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -38,6 +39,9 @@ const (
 	keyName     = "name"
 	keyDbSystem = "db_system"
 	keyDbName   = "db_name"
+	keyDbUrl    = "db_url"
+
+	AttributeSkywalkingSpanID = "sw8.span_id"
 )
 
 type metricKey string
@@ -183,10 +187,6 @@ func (p *connectorImp) exportMetrics(ctx context.Context) {
 // buildMetrics collects the computed raw metrics data, builds the metrics object and
 // writes the raw metrics data into the metrics object.
 func (p *connectorImp) buildMetrics() (pmetric.Metrics, error) {
-	if len(p.serverHistograms)+len(p.dbCallHistograms) == 0 {
-		return pmetric.Metrics{}, nil
-	}
-
 	m := pmetric.NewMetrics()
 	ilm := m.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
 	ilm.Scope().SetName("redmetricsconnector")
@@ -280,8 +280,8 @@ func (p *connectorImp) aggregateMetrics(traces ptrace.Traces) {
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		rspans := traces.ResourceSpans().At(i)
 		resourceAttr := rspans.Resource().Attributes()
-		pidAttr, ok := resourceAttr.Get(conventions.AttributeProcessPID)
-		if !ok {
+		pidIntValue := fillproc.GetPid(resourceAttr)
+		if pidIntValue <= 0 {
 			// 必须存在PID
 			continue
 		}
@@ -291,8 +291,8 @@ func (p *connectorImp) aggregateMetrics(traces ptrace.Traces) {
 			// 必须存在服务名
 			continue
 		}
-		pid := pidAttr.AsString()
-		containerId := getAttrValueWithDefault(resourceAttr, conventions.AttributeContainerID, "")
+		pid := strconv.FormatInt(pidIntValue, 10)
+		containerId := fillproc.GetContainerId(resourceAttr)
 		if len(containerId) > 12 {
 			containerId = containerId[:12]
 		}
@@ -319,22 +319,30 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 	latencyInNanoseconds := float64(endTime - startTime)
 
 	if p.config.ServerEnabled && (span.Kind() == ptrace.SpanKindServer || span.Kind() == ptrace.SpanKindConsumer) {
-		// Always reset the buffer before re-using.
-		p.keyValue.reset()
-		key := metricKey(p.buildKey(pid, containerId, serviceName, span))
-		if _, has := p.metricKeyToDimensions.Get(key); !has {
-			p.metricKeyToDimensions.Add(key, p.keyValue.GetMap())
+		swSpanId, exist := span.Attributes().Get(AttributeSkywalkingSpanID)
+		// 过滤Skywalking Undertow task线程的SpringMVC Entry
+		if !exist || swSpanId.Int() == 0 {
+			// Always reset the buffer before re-using.
+			p.keyValue.reset()
+			key := metricKey(p.buildKey(pid, containerId, serviceName, span))
+			if _, has := p.metricKeyToDimensions.Get(key); !has {
+				p.metricKeyToDimensions.Add(key, p.keyValue.GetMap())
+			}
+			updateHistogram(p.serverHistograms, key, latencyInNanoseconds)
 		}
-
-		updateHistogram(p.serverHistograms, key, latencyInNanoseconds)
 	}
 
 	if p.config.DbEnabled && span.Kind() != ptrace.SpanKindServer {
 		spanAttr := span.Attributes()
-		if dbSystemAttr, exist := spanAttr.Get(conventions.AttributeDBSystem); exist {
+		dbSystemAttr, systemExist := spanAttr.Get(conventions.AttributeDBSystem)
+		dbOperateAttr, operateExist := spanAttr.Get(conventions.AttributeDBOperation)
+		dbTableAttr, tableExist := spanAttr.Get(conventions.AttributeDBSQLTable)
+		dbUrlAttr, urlExist := spanAttr.Get(conventions.AttributeDBConnectionString)
+		if systemExist && operateExist && tableExist && urlExist {
 			p.keyValue.reset()
 			dbName := getAttrValueWithDefault(spanAttr, conventions.AttributeDBName, "")
-			dbCallKey := metricKey(p.buildDbKey(pid, containerId, serviceName, span, dbSystemAttr.AsString(), dbName))
+			dbError := span.Status().Code() == ptrace.StatusCodeError
+			dbCallKey := metricKey(p.buildDbKey(pid, containerId, serviceName, dbSystemAttr.Str(), dbName, dbOperateAttr.Str(), dbTableAttr.Str(), dbUrlAttr.Str(), dbError))
 			if _, has := p.dbCallMetricKeyToDimensions.Get(dbCallKey); !has {
 				p.dbCallMetricKeyToDimensions.Add(dbCallKey, p.keyValue.GetMap())
 			}
@@ -373,16 +381,17 @@ func (p *connectorImp) buildKey(pid string, containerId string, serviceName stri
 }
 
 // buildDbKey DB Red指标
-func (p *connectorImp) buildDbKey(pid string, containerId string, serviceName string, span ptrace.Span, dbSystem string, dbName string) string {
+func (p *connectorImp) buildDbKey(pid string, containerId string, serviceName string, dbSystem string, dbName string, dbOperate string, dbTable string, dbUrl string, isError bool) string {
 	p.keyValue.
 		Add(keyServiceName, serviceName).
 		Add(keyNodeName, p.nodeName).
 		Add(keyPid, pid).
 		Add(keyContainerId, containerId).
-		Add(keyName, span.Name()).
+		Add(keyName, fmt.Sprintf("%s %s", dbOperate, dbTable)).
 		Add(keyDbSystem, dbSystem).
 		Add(keyDbName, dbName).
-		Add(keyIsError, strconv.FormatBool(span.Status().Code() == ptrace.StatusCodeError))
+		Add(keyDbUrl, dbUrl).
+		Add(keyIsError, strconv.FormatBool(isError))
 	return p.keyValue.GetValue()
 }
 

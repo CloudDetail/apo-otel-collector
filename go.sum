@@ -553,8 +553,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.103.0/go.mod h1:VS66oUydCMwiWl1BFmLs7iNy4lGsfVYsriXr/d1fpAk=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8stest v0.103.0 h1:vSHoHLveqT9NULaIdIbfPgEvJ0e+UkBitb3dnawmunc=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8stest v0.103.0/go.mod h1:hCzgpzXbUUDUlETMDKYOpPaOhPjR9T6M3W3nAW5cGX4=
-github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.103.0 h1:j53/hdxxE6qphxI7S4ybo22/mT/0kDktWLgdwV5pB/Y=
-github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.103.0/go.mod h1:3GFvGay9sySyHLAFlkkV1N+fUNvHz5LcN8/gPFBzEYw=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatatest v0.103.0 h1:XYkQCe4UPFy7qmBs1zhknhe1wzPnAff4Rb4WtnD8aAQ=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatatest v0.103.0/go.mod h1:hmeKPJaZjzOjcndDxpWnjt0781EMqvj3or01baNVoRI=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.103.0 h1:1cZyMMLSpSWFdfITyVc9Bb+8rn175/GGwtWZQ3nClpc=
@@ -565,8 +563,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometh
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.103.0/go.mod h1:+WiRcWZOrXV3B5Qk0KlF5Tm7BopRvLpoPYqTrt4iA7s=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheusremotewrite v0.103.0 h1:MquBpfLZRaGnQeeIF3Kn+bQNXRLZtKTWGEysbNnxcRo=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheusremotewrite v0.103.0/go.mod h1:+3rCl7Z3Zm4ZZOyX9lMmaAoN8NeeCXUOmR/tysR631g=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/skywalking v0.103.0 h1:f1SRlZcPVXj6ldGcvggoeqEmwlIS6yWYgfYClNTEoT4=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/skywalking v0.103.0/go.mod h1:9Ci62BenVFIRgG2X2BD7fej70dizZ/3bnLhyN/nq+oI=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.103.0 h1:v19lfgrsflmimm0LGOZoB51eNO0305Yud6LCnhS7LPY=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.103.0/go.mod h1:Z8OvUd7UJJpyXT2O5ma8QT42NfkP/7Q0l1oxStJ/5MY=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.103.0 h1:Gg2j3yN2iCQYwK+464RyVvmX+QyjjdXL3JpG+6BfDAQ=
@@ -575,8 +571,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsrece
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.103.0/go.mod h1:5RY2vbjH6bRSuu5fSiHLh70P/TtsrCCGy9Hhhl6Ge7g=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.103.0 h1:V1N1X+KbjMauQsqW99vOfwTWBmdDGHafyoCN2LVtro4=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.103.0/go.mod h1:Sd26pFKO2fLsFKJCeQMn77k87z7lOyx5t2CISD5psR0=
-github.com/open-telemetry/opentelemetry-collector-contrib/receiver/skywalkingreceiver v0.103.0 h1:DQxlC7KrHdZtdxYSMGOQuwKVmuXGQkOdymt6O2+DOhA=
-github.com/open-telemetry/opentelemetry-collector-contrib/receiver/skywalkingreceiver v0.103.0/go.mod h1:wmzy8x+04rV7/xhNxEPoAH45nuvHBUzuCx8rubXVtug=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.0 h1:8SG7/vwALn54lVB/0yZ/MMwhFrPYtpEHQb2IpWsCzug=
@@ -723,6 +717,8 @@ github.com/vultr/govultr/v2 v2.17.2/go.mod h1:ZFOKGWmgjytfyjeyAdhQlSWwTjh2ig+X49
 github.com/xdg-go/pbkdf2 v1.0.0/go.mod h1:jrpuAogTd400dnrH08LKmI/xc1MbPOebTwRqcT5RDeI=
 github.com/xdg-go/scram v1.1.1/go.mod h1:RaEWvsqvNKKvBPvcKeFjrG2cJqOkHTiyTpzz23ni57g=
 github.com/xdg-go/stringprep v1.0.3/go.mod h1:W3f5j4i+9rC0kuIEJL0ky1VpHXQU3ocBgklLGvcBnW8=
+github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2 h1:zzrxE1FKn5ryBNl9eKOeqQ58Y/Qpo3Q9QNxKHX5uzzQ=
+github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2/go.mod h1:hzfGeIUDq/j97IG+FhNqkowIyEcD88LrW6fyU3K3WqY=
 github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d/go.mod h1:rHwXgn7JulP+udvsHwJoVG1YGAP6VLg4y9I5dyZdqmA=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

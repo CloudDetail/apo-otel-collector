@@ -4,17 +4,19 @@ module github.com/CloudDetail/apo-otel-collector
 
 go 1.21.0
 
+toolchain go1.21.5
+
 require (
 	github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor v0.0.0
+	github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver v0.0.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.103.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/skywalkingreceiver v0.103.0
 	go.opentelemetry.io/collector/component v0.103.0
 	go.opentelemetry.io/collector/confmap v0.103.0
 	go.opentelemetry.io/collector/confmap/converter/expandconverter v0.103.0
@@ -51,6 +53,8 @@ require (
 	github.com/ClickHouse/ch-go v0.61.5 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.23.0 // indirect
 	github.com/CloudDetail/apo-otel-collector/pkg/common v0.0.0 // indirect
+	github.com/CloudDetail/apo-otel-collector/pkg/fillproc v0.0.0 // indirect
+	github.com/CloudDetail/apo-otel-collector/pkg/sqlprune v0.0.0 // indirect
 	github.com/CloudDetail/metadata v0.0.0-20240903055919-f0487c96aa95 // indirect
 	github.com/Code-Hex/go-generics-cache v1.3.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -150,14 +154,11 @@ require (
 	github.com/mostynb/go-grpc-compression v1.2.3 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.103.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.103.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.103.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.103.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.103.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry v0.103.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.103.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/skywalking v0.103.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/openshift/api v3.9.0+incompatible // indirect
@@ -186,6 +187,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/vultr/govultr/v2 v2.17.2 // indirect
+	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/collector v0.103.0 // indirect
@@ -261,8 +263,14 @@ require (
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/common => ./pkg/common
 
+replace github.com/CloudDetail/apo-otel-collector/pkg/fillproc => ./pkg/fillproc
+
+replace github.com/CloudDetail/apo-otel-collector/pkg/sqlprune => ./pkg/sqlprune
+
 replace github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector => ./pkg/connector/redmetricsconnector
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension => ./pkg/extension/fillprocextension
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor => ./pkg/processor/metadataprocessor
+
+replace github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver => ./pkg/receiver/skywalkingreceiver

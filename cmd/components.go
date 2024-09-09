@@ -26,7 +26,7 @@ import (
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
 	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
-	skywalkingreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/skywalkingreceiver"
+	skywalkingreceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver"
 )
 
 func components() (otelcol.Factories, error) {
