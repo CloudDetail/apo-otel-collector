@@ -1,0 +1,12 @@
+type: fill_proc
+
+status:
+  class: extension
+  stability:
+    alpha: [extension]
+  distributions: [contrib]
+  codeowners:
+    active: []
+
+tests:
+  skip_lifecycle: true

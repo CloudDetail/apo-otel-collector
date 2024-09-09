@@ -16,6 +16,9 @@
 ### Connectors
 - [redmetricsconnector](./pkg/connector/redmetricsconnector)
 
+### Extensions
+- [fillprocextension](./pkg/extension/fillprocextension)
+
 ### Exporters
 - [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/debugexporter)
 - [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlpexporter)
@@ -84,4 +87,17 @@ connectors:
     max_services_to_track: 256
     # 每个服务下最大URL数，超过则将URL打标为 overflow_operation.
     max_operations_to_track_per_service: 2048
+```
+
+## FillProcExtension
+FillProcExtension插件 基于Peer信息获取PID 和 ContainerId信息
+
+配置示例
+```yaml
+extensions:
+  fill_proc:
+    enable: true
+    interval: 5s
+service:
+  extensions: [fill_proc]
 ```

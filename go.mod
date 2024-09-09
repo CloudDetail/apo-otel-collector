@@ -6,6 +6,7 @@ go 1.21.0
 
 require (
 	github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector v0.0.0
+	github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor v0.0.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.103.0
@@ -49,6 +50,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
 	github.com/ClickHouse/ch-go v0.61.5 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.23.0 // indirect
+	github.com/CloudDetail/apo-otel-collector/pkg/common v0.0.0 // indirect
 	github.com/CloudDetail/metadata v0.0.0-20240903055919-f0487c96aa95 // indirect
 	github.com/Code-Hex/go-generics-cache v1.3.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -257,6 +259,10 @@ require (
 	skywalking.apache.org/repo/goapi v0.0.0-20240104145220-ba7202308dd4 // indirect
 )
 
-replace github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor => ./pkg/processor/metadataprocessor
+replace github.com/CloudDetail/apo-otel-collector/pkg/common => ./pkg/common
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector => ./pkg/connector/redmetricsconnector
+
+replace github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension => ./pkg/extension/fillprocextension
+
+replace github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor => ./pkg/processor/metadataprocessor
