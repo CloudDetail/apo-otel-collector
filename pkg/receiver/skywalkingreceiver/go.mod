@@ -5,9 +5,9 @@ go 1.21.0
 toolchain go1.21.5
 
 require (
-	github.com/CloudDetail/apo-otel-collector/pkg/common v0.0.0
-	github.com/CloudDetail/apo-otel-collector/pkg/fillproc v0.0.0
-	github.com/CloudDetail/apo-otel-collector/pkg/sqlprune v0.0.0
+	github.com/CloudDetail/apo-otel-collector/pkg/common v0.0.0-00000000000000-000000000000
+	github.com/CloudDetail/apo-otel-collector/pkg/fillproc v0.0.0-00000000000000-000000000000
+	github.com/CloudDetail/apo-otel-collector/pkg/sqlprune v0.0.0-00000000000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/stretchr/testify v1.9.0
@@ -89,5 +89,7 @@ retract (
 )
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/common => ../../common
+
 replace github.com/CloudDetail/apo-otel-collector/pkg/fillproc => ../../fillproc
+
 replace github.com/CloudDetail/apo-otel-collector/pkg/sqlprune => ../../sqlprune

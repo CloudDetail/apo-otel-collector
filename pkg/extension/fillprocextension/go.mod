@@ -5,7 +5,7 @@ go 1.21.0
 toolchain go1.21.5
 
 require (
-	github.com/CloudDetail/apo-otel-collector/pkg/common v0.0.0
+	github.com/CloudDetail/apo-otel-collector/pkg/common v0.0.0-00000000000000-000000000000
 	github.com/stretchr/testify v1.9.0
 	go.opentelemetry.io/collector/component v0.103.0
 	go.opentelemetry.io/collector/confmap v0.103.0

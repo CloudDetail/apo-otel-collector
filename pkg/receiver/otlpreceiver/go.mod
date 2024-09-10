@@ -5,8 +5,8 @@ go 1.21.0
 toolchain go1.21.5
 
 require (
-	github.com/CloudDetail/apo-otel-collector/pkg/common v0.0.0
-	github.com/CloudDetail/apo-otel-collector/pkg/fillproc v0.0.0
+	github.com/CloudDetail/apo-otel-collector/pkg/common v0.0.0-00000000000000-000000000000
+	github.com/CloudDetail/apo-otel-collector/pkg/fillproc v0.0.0-00000000000000-000000000000
 	github.com/gogo/protobuf v1.3.2
 	github.com/klauspost/compress v1.17.8
 	github.com/stretchr/testify v1.9.0

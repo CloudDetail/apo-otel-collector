@@ -3,7 +3,7 @@ module github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnect
 go 1.21.0
 
 require (
-    github.com/CloudDetail/apo-otel-collector/pkg/fillproc v0.0.0
+	github.com/CloudDetail/apo-otel-collector/pkg/fillproc v0.0.0-00000000000000-000000000000
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/stretchr/testify v1.9.0
 	github.com/tilinna/clock v1.1.0
