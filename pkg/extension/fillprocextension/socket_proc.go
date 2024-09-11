@@ -92,3 +92,23 @@ func (p *SocketProcExtension) GetMatchPidAndContainerId(ctx context.Context) (in
 	}
 	return 0, ""
 }
+
+func (p *SocketProcExtension) GetMatchPidAndContainerIdForHttp(peerAddr string, serverAddr string) (int, string) {
+	if !p.enable || len(peerAddr) == 0 || len(serverAddr) == 0 {
+		return 0, ""
+	}
+
+	// 获取已关联Proc
+	if procInterface, found := p.cache.CachedSockets.Load(peerAddr); found {
+		procInfo := procInterface.(*proc.ProcInfo)
+		return procInfo.ProcessID, procInfo.ContainerId
+	}
+
+	// 判断是否已存储待关联Peer
+	if _, exist := p.cache.ToMapSockets.Load(peerAddr); !exist {
+		port, _ := strconv.Atoi(serverAddr[strings.LastIndex(serverAddr, ":")+1:])
+		// 记录Peer到待关联列表
+		p.cache.ToMapSockets.Store(peerAddr, port)
+	}
+	return 0, ""
+}

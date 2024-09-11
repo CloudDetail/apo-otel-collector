@@ -41,7 +41,7 @@ func handleTraces(resp http.ResponseWriter, req *http.Request, tracesReceiver *t
 		return
 	}
 
-	otlpResp, err := tracesReceiver.Export(req.Context(), otlpReq)
+	otlpResp, err := tracesReceiver.ExportHttp(req, otlpReq)
 	if err != nil {
 		writeError(resp, enc, err, http.StatusInternalServerError)
 		return

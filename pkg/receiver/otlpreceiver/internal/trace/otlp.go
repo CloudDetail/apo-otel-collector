@@ -5,6 +5,7 @@ package trace // import "github.com/CloudDetail/apo-otel-collector/pkg/receiver/
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/CloudDetail/apo-otel-collector/pkg/fillproc"
 	"github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver/internal/errors"
@@ -48,6 +49,52 @@ func (r *Receiver) Export(ctx context.Context, req ptraceotlp.ExportRequest) (pt
 	if r.fillProcExtension != nil {
 		pid, containerId = r.fillProcExtension.GetMatchPidAndContainerId(ctx)
 	}
+	ctx = r.obsreport.StartTracesOp(ctx)
+
+	if pid > 0 {
+		for i := 0; i < td.ResourceSpans().Len(); i++ {
+			rspans := td.ResourceSpans().At(i)
+			resourceAttr := rspans.Resource().Attributes()
+			resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
+			if containerId != "" {
+				resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
+			}
+		}
+	}
+	err := r.nextConsumer.ConsumeTraces(ctx, td)
+	r.obsreport.EndTracesOp(ctx, dataFormatProtobuf, numSpans, err)
+
+	// Use appropriate status codes for permanent/non-permanent errors
+	// If we return the error straightaway, then the grpc implementation will set status code to Unknown
+	// Refer: https://github.com/grpc/grpc-go/blob/v1.59.0/server.go#L1345
+	// So, convert the error to appropriate grpc status and return the error
+	// NonPermanent errors will be converted to codes.Unavailable (equivalent to HTTP 503)
+	// Permanent errors will be converted to codes.InvalidArgument (equivalent to HTTP 400)
+	if err != nil {
+		return ptraceotlp.NewExportResponse(), errors.GetStatusFromError(err)
+	}
+
+	return ptraceotlp.NewExportResponse(), nil
+}
+
+// Export implements the service Export traces func.
+func (r *Receiver) ExportHttp(httpReq *http.Request, req ptraceotlp.ExportRequest) (ptraceotlp.ExportResponse, error) {
+	td := req.Traces()
+	// We need to ensure that it propagates the receiver name as a tag
+	numSpans := td.SpanCount()
+	if numSpans == 0 {
+		return ptraceotlp.NewExportResponse(), nil
+	}
+
+	ctx := httpReq.Context()
+	var (
+		pid         int
+		containerId string
+	)
+	if r.fillProcExtension != nil {
+		pid, containerId = r.fillProcExtension.GetMatchPidAndContainerIdForHttp(httpReq.RemoteAddr, httpReq.Host)
+	}
+
 	ctx = r.obsreport.StartTracesOp(ctx)
 
 	if pid > 0 {

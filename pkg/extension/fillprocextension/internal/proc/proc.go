@@ -6,72 +6,12 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync"
-
-	"go.uber.org/zap"
 )
 
 const (
 	PATH_ROOT     = "/proc"
 	PREFIX_SOCKET = "socket:["
 )
-
-type ProcList struct {
-	Procs           sync.Map // <pid, *ProcInfo>
-	CachedInstances sync.Map // <instanceId, *ProcInfo>
-}
-
-func NewProcList() *ProcList {
-	return &ProcList{}
-}
-
-func (p *ProcList) GetCachedPidAndContainerId(instanceId string) (pid int, containerId string) {
-	if procInterface, ok := p.CachedInstances.Load(instanceId); ok {
-		procInfo := procInterface.(*ProcInfo)
-		pid = procInfo.ProcessID
-		containerId = procInfo.ContainerId
-	}
-	return
-}
-
-func (p *ProcList) GetVmProcInfo(pid int) *ProcInfo {
-	if procInterface, ok := p.Procs.Load(pid); ok {
-		return procInterface.(*ProcInfo)
-	}
-	return nil
-}
-
-func (p *ProcList) ScanNewPids(logger *zap.Logger) {
-	pids, err := FindAllProcesses()
-	if err != nil {
-		logger.Error("Scan Process Failed", zap.Error(err))
-		return
-	}
-
-	p.Procs.Range(func(k, v interface{}) bool {
-		if _, exist := pids[k.(int)]; !exist {
-			// 已删除PID
-			p.Procs.Delete(k)
-		}
-		return true
-	})
-	for pid := range pids {
-		if _, ok := p.Procs.Load(pid); !ok {
-			// 新增PID
-			process := ScanProc(pid)
-			p.Procs.Store(pid, process)
-			if !process.Ignore {
-				logger.Info("Scan Proc",
-					zap.Int("pid", process.ProcessID),
-					zap.Int("nsPid", process.NsPid),
-					zap.String("host", process.HostName),
-					zap.String("Comm", process.Comm),
-					zap.String("ContainerId", process.ContainerId),
-				)
-			}
-		}
-	}
-}
 
 type ProcInfo struct {
 	ProcessID   int

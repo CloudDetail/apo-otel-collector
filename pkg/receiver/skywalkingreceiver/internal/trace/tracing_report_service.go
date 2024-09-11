@@ -96,6 +96,25 @@ func (r *Receiver) CollectInSync(ctx context.Context, segments *agent.SegmentCol
 	return &common.Commands{}, nil
 }
 
+func (r *Receiver) consumeHttpTraces(req *http.Request, segment *agent.SegmentObject) error {
+	if segment == nil {
+		return nil
+	}
+	var (
+		pid         int
+		containerId string
+	)
+	if r.FillProcExtension != nil {
+		pid, containerId = r.FillProcExtension.GetMatchPidAndContainerIdForHttp(req.RemoteAddr, req.Host)
+	}
+	ptd := ProtoToTraces(segment, pid, containerId)
+
+	if result := r.undertowCache.CheckUndertow(segment, &ptd); result != nil {
+		return r.nextConsumer.ConsumeTraces(req.Context(), *result)
+	}
+	return nil
+}
+
 func (r *Receiver) consumeTraces(ctx context.Context, segment *agent.SegmentObject) error {
 	if segment == nil {
 		return nil
@@ -130,7 +149,7 @@ func (r *Receiver) HTTPHandler(rsp http.ResponseWriter, req *http.Request) {
 	}
 
 	for _, segment := range data {
-		err = r.consumeTraces(req.Context(), segment)
+		err = r.consumeHttpTraces(req, segment)
 		if err != nil {
 			fmt.Printf("cannot consume traces, %v", err)
 		}
