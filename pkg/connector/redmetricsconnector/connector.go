@@ -27,10 +27,12 @@ const (
 	overflowOperation   = "overflow_operation"
 
 	envNodeName = "MY_NODE_NAME"
+	envNodeIP   = "MY_NODE_IP"
 
 	keyServiceName = "svc_name"
 	keyContentKey  = "content_key"
 	keyNodeName    = "node_name"
+	keyNodeIp      = "node_ip"
 	keyTopSpan     = "top_span"
 	keyIsError     = "is_error"
 	keyPid         = "pid"
@@ -55,6 +57,7 @@ type connectorImp struct {
 
 	// 主机名
 	nodeName string
+	nodeIp   string
 
 	// Histogram.
 	serverHistograms map[metricKey]*cache.Histogram // 服务 指标
@@ -103,6 +106,7 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		logger:                                 logger,
 		config:                                 *pConfig,
 		nodeName:                               getNodeName(),
+		nodeIp:                                 getNodeIp(),
 		serverHistograms:                       make(map[metricKey]*cache.Histogram),
 		dbCallHistograms:                       make(map[metricKey]*cache.Histogram),
 		keyValue:                               newKeyValue(100), // 最大100的KeyValue 可重用Map
@@ -367,6 +371,7 @@ func (p *connectorImp) buildKey(pid string, containerId string, serviceName stri
 		Add(keyServiceName, serviceName).
 		Add(keyContentKey, spanName).
 		Add(keyNodeName, p.nodeName).
+		Add(keyNodeIp, p.nodeIp).
 		Add(keyPid, pid).
 		Add(keyContainerId, containerId).
 		Add(keyTopSpan, strconv.FormatBool(span.ParentSpanID().IsEmpty())).
@@ -385,6 +390,7 @@ func (p *connectorImp) buildDbKey(pid string, containerId string, serviceName st
 	p.keyValue.
 		Add(keyServiceName, serviceName).
 		Add(keyNodeName, p.nodeName).
+		Add(keyNodeIp, p.nodeIp).
 		Add(keyPid, pid).
 		Add(keyContainerId, containerId).
 		Add(keyName, fmt.Sprintf("%s %s", dbOperate, dbTable)).
@@ -473,6 +479,14 @@ func getNodeName() string {
 	// 使用主机名作为NodeName
 	if hostName, err := os.Hostname(); err == nil {
 		return hostName
+	}
+	return "Unknown"
+}
+
+func getNodeIp() string {
+	// 从环境变量获取NodeIP
+	if nodeIpFromEnv, exist := os.LookupEnv(envNodeIP); exist {
+		return nodeIpFromEnv
 	}
 	return "Unknown"
 }
