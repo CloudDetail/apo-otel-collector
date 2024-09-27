@@ -569,6 +569,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.103.0/go.mod h1:VS66oUydCMwiWl1BFmLs7iNy4lGsfVYsriXr/d1fpAk=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8stest v0.103.0 h1:vSHoHLveqT9NULaIdIbfPgEvJ0e+UkBitb3dnawmunc=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8stest v0.103.0/go.mod h1:hCzgpzXbUUDUlETMDKYOpPaOhPjR9T6M3W3nAW5cGX4=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/golden v0.103.0 h1:GMx3/P287NuWOJH22eLCtaJ1ATW8BoOZL6GjINUAVYI=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/golden v0.103.0/go.mod h1:xGM9aD/2Dww/WKg5ei7a43TRSWuVwgMO9NPjPbgtmT8=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.103.0 h1:angDCU0CPBLu2fAi7r7yCEWxRKthhNnYnMugdiULmvw=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.103.0/go.mod h1:N80rYgsjtq+G/DJQVCLCkxmpCIA/mnQTRUJxa8mMNsw=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatatest v0.103.0 h1:XYkQCe4UPFy7qmBs1zhknhe1wzPnAff4Rb4WtnD8aAQ=
