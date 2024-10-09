@@ -11,6 +11,7 @@ import (
 
 	"github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector/internal/cache"
 	"github.com/CloudDetail/apo-otel-collector/pkg/fillproc"
+	"github.com/CloudDetail/apo-otel-collector/pkg/sqlprune"
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -342,6 +343,22 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 		dbOperateAttr, operateExist := spanAttr.Get(conventions.AttributeDBOperation)
 		dbTableAttr, tableExist := spanAttr.Get(conventions.AttributeDBSQLTable)
 		dbUrlAttr, urlExist := spanAttr.Get(conventions.AttributeDBConnectionString)
+		if !tableExist || !operateExist {
+			if dbStatement, sqlExist := spanAttr.Get(conventions.AttributeDBStatement); sqlExist {
+				operation, table := sqlprune.SQLParseOperationAndTableNEW(dbStatement.Str())
+				if operation != "" {
+					if !operateExist {
+						operateExist = true
+						dbOperateAttr = pcommon.NewValueStr(operation)
+					}
+					if !tableExist {
+						tableExist = true
+						dbTableAttr = pcommon.NewValueStr(table)
+					}
+				}
+			}
+		}
+
 		if systemExist && operateExist && tableExist && urlExist {
 			p.keyValue.reset()
 			dbName := getAttrValueWithDefault(spanAttr, conventions.AttributeDBName, "")

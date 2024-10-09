@@ -4,6 +4,7 @@ go 1.21.0
 
 require (
 	github.com/CloudDetail/apo-otel-collector/pkg/fillproc v0.0.0-00000000000000-000000000000
+	github.com/CloudDetail/apo-otel-collector/pkg/sqlprune v0.0.0-00000000000000-000000000000
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/stretchr/testify v1.9.0
 	github.com/tilinna/clock v1.1.0
@@ -40,6 +41,7 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.54.0 // indirect
 	github.com/prometheus/procfs v0.15.0 // indirect
+	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2 // indirect
 	go.opentelemetry.io/collector v0.103.0 // indirect
 	go.opentelemetry.io/collector/config/configtelemetry v0.103.0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.10.0 // indirect
@@ -60,3 +62,5 @@ require (
 )
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/fillproc => ../../fillproc
+
+replace github.com/CloudDetail/apo-otel-collector/pkg/sqlprune => ../../sqlprune
