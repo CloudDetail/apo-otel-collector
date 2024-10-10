@@ -55,19 +55,19 @@ func (r *Receiver) Export(ctx context.Context, req ptraceotlp.ExportRequest) (pt
 	}
 	ctx = r.obsreport.StartTracesOp(ctx)
 
-	if pid > 0 {
-		for i := 0; i < td.ResourceSpans().Len(); i++ {
-			resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
-			if beylaGoPid := getBeylaGoPid(resourceAttr); beylaGoPid > 0 {
-				pid = beylaGoPid
-				if r.fillProcExtension != nil {
-					containerId = r.fillProcExtension.GetContainerIdByPid(pid)
-				}
+	for i := 0; i < td.ResourceSpans().Len(); i++ {
+		resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
+		if beylaGoPid := getBeylaGoPid(resourceAttr); beylaGoPid > 0 {
+			pid = beylaGoPid
+			if r.fillProcExtension != nil {
+				containerId = r.fillProcExtension.GetContainerIdByPid(pid)
 			}
+		}
+		if pid > 0 {
 			resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
-			if containerId != "" {
-				resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
-			}
+		}
+		if containerId != "" {
+			resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
 		}
 	}
 	err := r.nextConsumer.ConsumeTraces(ctx, td)
@@ -119,19 +119,19 @@ func (r *Receiver) ExportHttp(httpReq *http.Request, req ptraceotlp.ExportReques
 
 	ctx = r.obsreport.StartTracesOp(ctx)
 
-	if pid > 0 {
-		for i := 0; i < td.ResourceSpans().Len(); i++ {
-			resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
-			if beylaGoPid := getBeylaGoPid(resourceAttr); beylaGoPid > 0 {
-				pid = beylaGoPid
-				if r.fillProcExtension != nil {
-					containerId = r.fillProcExtension.GetContainerIdByPid(pid)
-				}
+	for i := 0; i < td.ResourceSpans().Len(); i++ {
+		resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
+		if beylaGoPid := getBeylaGoPid(resourceAttr); beylaGoPid > 0 {
+			pid = beylaGoPid
+			if r.fillProcExtension != nil {
+				containerId = r.fillProcExtension.GetContainerIdByPid(pid)
 			}
+		}
+		if pid > 0 {
 			resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
-			if containerId != "" {
-				resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
-			}
+		}
+		if containerId != "" {
+			resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
 		}
 	}
 	err := r.nextConsumer.ConsumeTraces(ctx, td)
