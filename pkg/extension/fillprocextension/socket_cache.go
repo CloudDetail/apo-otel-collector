@@ -9,15 +9,16 @@ import (
 
 type SocketCache struct {
 	logger        *zap.Logger
-	Procs         map[int]*proc.ProcInfo // 无需加锁，只有定时扫描更新
-	ToMapSockets  sync.Map               // <peerSocket, int>
-	CachedSockets sync.Map               // <peerSocket, *ProcInfo
+	activeProcNum int
+	Procs         sync.Map // <int, *proc.ProcInfo>
+	ToMapSockets  sync.Map // <peerSocket, int>
+	CachedSockets sync.Map // <peerSocket, *ProcInfo
 }
 
 func newSocketCache(logger *zap.Logger) *SocketCache {
 	return &SocketCache{
-		logger: logger,
-		Procs:  make(map[int]*proc.ProcInfo),
+		logger:        logger,
+		activeProcNum: 0,
 	}
 }
 
@@ -32,7 +33,7 @@ func (c *SocketCache) mapSocketToPids() {
 
 	if len(toMatchPeers) > 0 {
 		c.scanNewProcs()
-		if len(c.Procs) == 0 {
+		if c.activeProcNum == 0 {
 			// Windows环境无法扫描进程信息，返回空.
 			return
 		}
@@ -61,18 +62,21 @@ func (c *SocketCache) scanNewProcs() {
 		return
 	}
 
-	for pid := range c.Procs {
-		if _, exist := pids[pid]; !exist {
+	c.Procs.Range(func(k, v interface{}) bool {
+		if _, exist := pids[k.(int)]; !exist {
 			// 清理已删除PID
-			delete(c.Procs, pid)
+			c.Procs.Delete(k)
+			c.activeProcNum -= 1
 		}
-	}
+		return true
+	})
 
 	for pid := range pids {
-		if _, ok := c.Procs[pid]; !ok {
+		if _, ok := c.Procs.Load(pid); !ok {
 			// 新增PID
 			process := proc.ScanProc(pid)
-			c.Procs[pid] = process
+			c.Procs.Store(pid, process)
+			c.activeProcNum += 1
 			if !process.Ignore {
 				c.logger.Info("Scan Proc",
 					zap.Int("pid", process.ProcessID),
@@ -91,11 +95,12 @@ func (c *SocketCache) matchSockets(peers map[string]int) map[string]*proc.ProcIn
 	// 先分析检索VM的Proc，VM应用由于共用同一个Net，需相关遍历/proc/{pid}/fd文件夹
 	if socks, err := proc.ListVMMatchNetSocks(peers); err == nil && len(socks) > 0 {
 		// 基于Peer寻找到对应的Sock
-		for _, procInfo := range c.Procs {
+		c.Procs.Range(func(k, v interface{}) bool {
+			procInfo := v.(*proc.ProcInfo)
 			if procInfo.Ignore {
 				// 考虑到容器应用也允许 开启主机模式，不对进程做过滤
 				// 不分析Ignore
-				continue
+				return true
 			}
 			if matchPeer := procInfo.GetMatchNetSocket(socks); matchPeer != "" {
 				result[matchPeer] = procInfo
@@ -104,19 +109,21 @@ func (c *SocketCache) matchSockets(peers map[string]int) map[string]*proc.ProcIn
 				delete(peers, matchPeer)
 			}
 			if len(socks) == 0 {
-				break
+				return false
 			}
-		}
+			return true
+		})
 	}
 
 	if len(peers) == 0 {
 		return result
 	}
 
-	for _, procInfo := range c.Procs {
+	c.Procs.Range(func(k, v interface{}) bool {
+		procInfo := v.(*proc.ProcInfo)
 		if procInfo.Ignore || procInfo.IsVm() {
 			// 不分析Ignore 和 虚机场景
-			continue
+			return true
 		}
 		// 容器网络场景，分析每个PID的tcp数据
 		if socks, err := procInfo.ListMatchNetSocks(peers); err == nil && len(socks) > 0 {
@@ -129,9 +136,10 @@ func (c *SocketCache) matchSockets(peers map[string]int) map[string]*proc.ProcIn
 
 		if len(peers) == 0 {
 			// 已完全匹配，提前退出
-			return result
+			return false
 		}
-	}
+		return true
+	})
 
 	if len(peers) == 0 {
 		return result
@@ -144,4 +152,11 @@ func (c *SocketCache) matchSockets(peers map[string]int) map[string]*proc.ProcIn
 		)
 	}
 	return result
+}
+
+func (c *SocketCache) GetContainerIdByPid(pid int) string {
+	if procInfoInterface, found := c.Procs.Load(pid); found {
+		return procInfoInterface.(*proc.ProcInfo).ContainerId
+	}
+	return ""
 }

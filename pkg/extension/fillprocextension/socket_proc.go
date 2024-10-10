@@ -112,3 +112,7 @@ func (p *SocketProcExtension) GetMatchPidAndContainerIdForHttp(peerAddr string, 
 	}
 	return 0, ""
 }
+
+func (p *SocketProcExtension) GetContainerIdByPid(pid int) string {
+	return p.cache.GetContainerIdByPid(pid)
+}

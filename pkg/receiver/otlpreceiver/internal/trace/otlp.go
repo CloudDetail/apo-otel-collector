@@ -6,12 +6,16 @@ package trace // import "github.com/CloudDetail/apo-otel-collector/pkg/receiver/
 import (
 	"context"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/CloudDetail/apo-otel-collector/pkg/fillproc"
 	"github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver/internal/errors"
 	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 	"go.opentelemetry.io/collector/receiver/receiverhelper"
+	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 )
 
 const dataFormatProtobuf = "protobuf"
@@ -53,8 +57,13 @@ func (r *Receiver) Export(ctx context.Context, req ptraceotlp.ExportRequest) (pt
 
 	if pid > 0 {
 		for i := 0; i < td.ResourceSpans().Len(); i++ {
-			rspans := td.ResourceSpans().At(i)
-			resourceAttr := rspans.Resource().Attributes()
+			resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
+			if beylaGoPid := getBeylaGoPid(resourceAttr); beylaGoPid > 0 {
+				pid = beylaGoPid
+				if r.fillProcExtension != nil {
+					containerId = r.fillProcExtension.GetContainerIdByPid(pid)
+				}
+			}
 			resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
 			if containerId != "" {
 				resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
@@ -75,6 +84,19 @@ func (r *Receiver) Export(ctx context.Context, req ptraceotlp.ExportRequest) (pt
 	}
 
 	return ptraceotlp.NewExportResponse(), nil
+}
+
+func getBeylaGoPid(attributes pcommon.Map) int {
+	if sdkLanguage, languageExist := attributes.Get(conventions.AttributeTelemetrySDKLanguage); languageExist && sdkLanguage.Str() != "go" {
+		return 0
+	}
+	if serviceInstanceId, instanceExist := attributes.Get(conventions.AttributeServiceInstanceID); instanceExist && strings.HasPrefix(serviceInstanceId.Str(), "beyla-") {
+		instanceId := serviceInstanceId.Str()
+		if pid, err := strconv.Atoi(instanceId[strings.LastIndex(instanceId, "-")+1:]); err == nil {
+			return pid
+		}
+	}
+	return 0
 }
 
 // Export implements the service Export traces func.
@@ -99,8 +121,13 @@ func (r *Receiver) ExportHttp(httpReq *http.Request, req ptraceotlp.ExportReques
 
 	if pid > 0 {
 		for i := 0; i < td.ResourceSpans().Len(); i++ {
-			rspans := td.ResourceSpans().At(i)
-			resourceAttr := rspans.Resource().Attributes()
+			resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
+			if beylaGoPid := getBeylaGoPid(resourceAttr); beylaGoPid > 0 {
+				pid = beylaGoPid
+				if r.fillProcExtension != nil {
+					containerId = r.fillProcExtension.GetContainerIdByPid(pid)
+				}
+			}
 			resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
 			if containerId != "" {
 				resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
