@@ -14,14 +14,14 @@ const (
 )
 
 type ProcInfo struct {
-	ProcessID   int
-	ExeName     string
-	CmdLine     string
-	Comm        string
-	HostName    string
-	NsPid       int
-	ContainerId string
-	Ignore      bool
+	ProcessID    int
+	ExeName      string
+	CmdLine      string
+	Comm         string
+	HostName     string
+	ContainerId  string
+	NetNamespace string
+	Ignore       bool
 }
 
 func ScanProc(pid int) (p *ProcInfo) {
@@ -30,6 +30,11 @@ func ScanProc(pid int) (p *ProcInfo) {
 	}
 	// 存在Exe不存在
 	if p.ExeName, _ = GetExeName(pid); p.ExeName == "" {
+		p.Ignore = true
+		return
+	}
+	// 提取获取NetNameSpace，避免被黑名单过滤
+	if p.NetNamespace, _ = GetNetNamespace(pid); p.NetNamespace == "" {
 		p.Ignore = true
 		return
 	}
@@ -48,18 +53,10 @@ func ScanProc(pid int) (p *ProcInfo) {
 		p.Ignore = true
 		return
 	}
-	// 读取NamespacePid
-	p.NsPid = GetNsPid(pid)
 	// 读取ContainerId
-	if p.NsPid > 0 && p.NsPid != pid {
-		p.ContainerId, _ = GetContainerIDFromCGroup(pid)
-	}
+	p.ContainerId, _ = GetContainerIDFromCGroup(pid)
 
 	return
-}
-
-func (p *ProcInfo) IsVm() bool {
-	return p.ContainerId == ""
 }
 
 func (p *ProcInfo) ListMatchNetSocks(peers map[string]int) (map[string]*SockTabEntry, error) {
@@ -152,72 +149,12 @@ func GetHostName(pid int) (string, error) {
 	}
 }
 
+func GetNetNamespace(pid int) (string, error) {
+	return os.Readlink(Path(pid, "ns", "net"))
+}
+
 func Path(pid int, subpath ...string) string {
 	return path.Join(append([]string{PATH_ROOT, strconv.Itoa(pid)}, subpath...)...)
-}
-
-func GetNsPid(pid int) int {
-	data, err := os.ReadFile(Path(pid, "status"))
-	if err != nil {
-		return 0
-	}
-
-	for _, line := range strings.Split(string(data), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
-		}
-		if fields[0] == "NSpid:" {
-			if len(fields) == 3 {
-				if nsPid, err := strconv.Atoi(fields[2]); err == nil {
-					return nsPid
-				}
-			}
-			return pid
-		}
-	}
-	// Linux kernels < 4.1
-	// 低版本缺失NsPid，采用/proc/pid/sched获取
-	return altLookupNspid(pid)
-}
-
-// Linux kernels < 4.1 do not export NStgid field in /proc/pid/status.
-// Fortunately, /proc/pid/sched in a container exposes a host PID,
-// so the idea is to scan all container PIDs to find which one matches the host PID.
-func altLookupNspid(pid int) int {
-	dirs, err := os.ReadDir(Path(pid, "root", "proc"))
-	if err != nil {
-		return 0
-	}
-	for _, di := range dirs {
-		if !di.IsDir() {
-			continue
-		}
-		if nsPid, _ := isDirectoryPid(di.Name()); nsPid > 0 {
-			if hostPid := schedGetHostPid(Path(pid, "root", "proc", di.Name(), "sched")); hostPid == pid {
-				return nsPid
-			}
-		}
-	}
-	return 0
-}
-
-// The first line of /proc/pid/sched looks like
-// java (1234, #threads: 12)
-// where 1234 is the host PID (before Linux 4.1)
-func schedGetHostPid(path string) int {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return 0
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		if index := strings.Index(line, "("); index != -1 {
-			endIndex := strings.Index(line, ",")
-			hostPid, _ := strconv.Atoi(line[index+1 : endIndex])
-			return hostPid
-		}
-	}
-	return 0
 }
 
 func FindAllProcesses() (map[int]bool, error) {

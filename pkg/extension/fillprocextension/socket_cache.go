@@ -8,11 +8,12 @@ import (
 )
 
 type SocketCache struct {
-	logger        *zap.Logger
-	activeProcNum int
-	Procs         sync.Map // <int, *proc.ProcInfo>
-	ToMapSockets  sync.Map // <peerSocket, int>
-	CachedSockets sync.Map // <peerSocket, *ProcInfo
+	logger           *zap.Logger
+	activeProcNum    int
+	Procs            sync.Map // <int, *proc.ProcInfo>
+	ToMapSockets     sync.Map // <peerSocket, int>
+	CachedSockets    sync.Map // <peerSocket, *ProcInfo
+	HostNetNamespace string
 }
 
 func newSocketCache(logger *zap.Logger) *SocketCache {
@@ -37,6 +38,11 @@ func (c *SocketCache) mapSocketToPids() {
 			// Windows环境无法扫描进程信息，返回空.
 			return
 		}
+		if c.HostNetNamespace == "" {
+			if hostProc, exist := c.Procs.Load(1); exist {
+				c.HostNetNamespace = hostProc.(*proc.ProcInfo).NetNamespace
+			}
+		}
 
 		result := c.matchSockets(toMatchPeers)
 		for peer, matchedProc := range result {
@@ -44,7 +50,6 @@ func (c *SocketCache) mapSocketToPids() {
 				c.logger.Info("Match Socket",
 					zap.String("peer", peer),
 					zap.Int("pid", matchedProc.ProcessID),
-					zap.Int("nsPid", matchedProc.NsPid),
 					zap.String("host", matchedProc.HostName),
 					zap.String("Comm", matchedProc.Comm),
 					zap.String("ContainerId", matchedProc.ContainerId),
@@ -80,7 +85,6 @@ func (c *SocketCache) scanNewProcs() {
 			if !process.Ignore {
 				c.logger.Info("Scan Proc",
 					zap.Int("pid", process.ProcessID),
-					zap.Int("nsPid", process.NsPid),
 					zap.String("host", process.HostName),
 					zap.String("Comm", process.Comm),
 					zap.String("ContainerId", process.ContainerId),
@@ -119,37 +123,35 @@ func (c *SocketCache) matchSockets(peers map[string]int) map[string]*proc.ProcIn
 		return result
 	}
 
-	c.Procs.Range(func(k, v interface{}) bool {
-		procInfo := v.(*proc.ProcInfo)
-		if procInfo.Ignore || procInfo.IsVm() {
-			// 不分析Ignore 和 虚机场景
-			return true
-		}
-		// 容器网络场景，分析每个PID的tcp数据
-		if socks, err := procInfo.ListMatchNetSocks(peers); err == nil && len(socks) > 0 {
-			for peer := range socks {
-				result[peer] = procInfo
-				// 移除peers，减少后续检索
-				delete(peers, peer)
+	if c.HostNetNamespace != "" {
+		c.Procs.Range(func(k, v interface{}) bool {
+			procInfo := v.(*proc.ProcInfo)
+			if procInfo.Ignore || procInfo.NetNamespace == c.HostNetNamespace {
+				// 不分析Ignore 和 虚机场景
+				return true
 			}
+			// 容器网络场景，分析每个PID的tcp数据
+			if socks, err := procInfo.ListMatchNetSocks(peers); err == nil && len(socks) > 0 {
+				for peer := range socks {
+					result[peer] = procInfo
+					// 移除peers，减少后续检索
+					delete(peers, peer)
+				}
+			}
+
+			if len(peers) == 0 {
+				// 已完全匹配，提前退出
+				return false
+			}
+			return true
+		})
+
+		for peer, serverPort := range peers {
+			c.logger.Warn("NotMatch Socket",
+				zap.String("peer", peer),
+				zap.Int("port", serverPort),
+			)
 		}
-
-		if len(peers) == 0 {
-			// 已完全匹配，提前退出
-			return false
-		}
-		return true
-	})
-
-	if len(peers) == 0 {
-		return result
-	}
-
-	for peer, serverPort := range peers {
-		c.logger.Warn("NotMatch Socket",
-			zap.String("peer", peer),
-			zap.Int("port", serverPort),
-		)
 	}
 	return result
 }
