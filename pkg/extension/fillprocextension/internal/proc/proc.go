@@ -101,7 +101,7 @@ func (p *ProcInfo) GetMatchNetSocket(socks map[string]*SockTabEntry) string {
 
 func ListVMMatchNetSocks(peers map[string]int) (map[string]*SockTabEntry, error) {
 	result := make(map[string]*SockTabEntry, 0)
-	if err := DoNetstat("/proc/net/tcp6", peers, result); err != nil {
+	if err := DoNetstat("/proc/net/tcp", peers, result); err != nil {
 		return nil, err
 	}
 	if err := DoNetstat("/proc/net/tcp6", peers, result); err != nil {
