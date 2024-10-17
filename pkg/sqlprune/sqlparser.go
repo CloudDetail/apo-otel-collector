@@ -128,6 +128,8 @@ func SQLParseOperationAndTableNEW(query string) (string, string) {
 
 	var tables []string
 	tables = getTableNames(reflect.Indirect(reflect.ValueOf(stmt)), tables, 0, false)
-
+	if len(tables) == 0 {
+		return "", ""
+	}
 	return "SELECT", tables[0]
 }

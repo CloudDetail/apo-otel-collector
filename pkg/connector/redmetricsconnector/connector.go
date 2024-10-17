@@ -355,6 +355,16 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 						tableExist = true
 						dbTableAttr = pcommon.NewValueStr(table)
 					}
+				} else {
+					url := ""
+					if urlExist {
+						url = dbUrlAttr.Str()
+					}
+					p.logger.Info("Drop SQL by parse failed",
+						zap.String("span", span.Name()),
+						zap.String("sql", dbStatement.Str()),
+						zap.String("url", url),
+					)
 				}
 			}
 		}
