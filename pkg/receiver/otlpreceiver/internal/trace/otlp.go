@@ -57,8 +57,8 @@ func (r *Receiver) Export(ctx context.Context, req ptraceotlp.ExportRequest) (pt
 
 	for i := 0; i < td.ResourceSpans().Len(); i++ {
 		resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
-		if beylaGoPid := getBeylaGoPid(resourceAttr); beylaGoPid > 0 {
-			pid = beylaGoPid
+		if beylaPid := getBeylaPid(resourceAttr); beylaPid > 0 {
+			pid = beylaPid
 			if r.fillProcExtension != nil {
 				containerId = r.fillProcExtension.GetContainerIdByPid(pid)
 			}
@@ -86,8 +86,8 @@ func (r *Receiver) Export(ctx context.Context, req ptraceotlp.ExportRequest) (pt
 	return ptraceotlp.NewExportResponse(), nil
 }
 
-func getBeylaGoPid(attributes pcommon.Map) int {
-	if sdkLanguage, languageExist := attributes.Get(conventions.AttributeTelemetrySDKLanguage); languageExist && sdkLanguage.Str() != "go" {
+func getBeylaPid(attributes pcommon.Map) int {
+	if sdkName, sdkExist := attributes.Get(conventions.AttributeTelemetrySDKName); sdkExist && sdkName.Str() != "beyla" {
 		return 0
 	}
 	if serviceInstanceId, instanceExist := attributes.Get(conventions.AttributeServiceInstanceID); instanceExist && strings.HasPrefix(serviceInstanceId.Str(), "beyla-") {
@@ -121,8 +121,8 @@ func (r *Receiver) ExportHttp(httpReq *http.Request, req ptraceotlp.ExportReques
 
 	for i := 0; i < td.ResourceSpans().Len(); i++ {
 		resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
-		if beylaGoPid := getBeylaGoPid(resourceAttr); beylaGoPid > 0 {
-			pid = beylaGoPid
+		if beylaPid := getBeylaPid(resourceAttr); beylaPid > 0 {
+			pid = beylaPid
 			if r.fillProcExtension != nil {
 				containerId = r.fillProcExtension.GetContainerIdByPid(pid)
 			}
