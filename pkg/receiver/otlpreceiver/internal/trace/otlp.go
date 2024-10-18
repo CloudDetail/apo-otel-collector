@@ -90,7 +90,7 @@ func getBeylaPid(attributes pcommon.Map) int {
 	if sdkName, sdkExist := attributes.Get(conventions.AttributeTelemetrySDKName); sdkExist && sdkName.Str() != "beyla" {
 		return 0
 	}
-	if serviceInstanceId, instanceExist := attributes.Get(conventions.AttributeServiceInstanceID); instanceExist && strings.HasPrefix(serviceInstanceId.Str(), "beyla-") {
+	if serviceInstanceId, instanceExist := attributes.Get(conventions.AttributeServiceInstanceID); instanceExist {
 		instanceId := serviceInstanceId.Str()
 		if pid, err := strconv.Atoi(instanceId[strings.LastIndex(instanceId, "-")+1:]); err == nil {
 			return pid
