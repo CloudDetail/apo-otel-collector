@@ -3,9 +3,7 @@ package fillproc
 import "context"
 
 type FillProc interface {
-	GetMatchPidAndContainerId(ctx context.Context) (int, string)
+	GetMatchPidAndContainerId(ctx context.Context, serviceName string, instanceId string, sdkName string) (int, string)
 
-	GetMatchPidAndContainerIdForHttp(peerAddr string, serverAddr string) (int, string)
-
-	GetContainerIdByPid(pid int) string
+	GetMatchPidAndContainerIdForHttp(peerAddr string, serverAddr string, serviceName string, instanceId string, sdkName string) (int, string)
 }

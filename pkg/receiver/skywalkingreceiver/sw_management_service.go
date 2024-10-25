@@ -15,14 +15,14 @@ type SwManagementServiceServer struct {
 
 func (s *SwManagementServiceServer) ReportInstanceProperties(ctx context.Context, properties *management.InstanceProperties) (*v3.Commands, error) {
 	if s.TraceReceiver != nil && s.TraceReceiver.FillProcExtension != nil {
-		s.TraceReceiver.FillProcExtension.GetMatchPidAndContainerId(ctx)
+		s.TraceReceiver.FillProcExtension.GetMatchPidAndContainerId(ctx, properties.Service, properties.ServiceInstance, "")
 	}
 	return nil, nil
 }
 
 func (s *SwManagementServiceServer) KeepAlive(ctx context.Context, ping *management.InstancePingPkg) (*v3.Commands, error) {
 	if s.TraceReceiver != nil && s.TraceReceiver.FillProcExtension != nil {
-		s.TraceReceiver.FillProcExtension.GetMatchPidAndContainerId(ctx)
+		s.TraceReceiver.FillProcExtension.GetMatchPidAndContainerId(ctx, ping.Service, ping.ServiceInstance, "")
 	}
 	return nil, nil
 }

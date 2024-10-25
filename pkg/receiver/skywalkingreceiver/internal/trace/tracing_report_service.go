@@ -105,7 +105,7 @@ func (r *Receiver) consumeHttpTraces(req *http.Request, segment *agent.SegmentOb
 		containerId string
 	)
 	if r.FillProcExtension != nil {
-		pid, containerId = r.FillProcExtension.GetMatchPidAndContainerIdForHttp(req.RemoteAddr, req.Host)
+		pid, containerId = r.FillProcExtension.GetMatchPidAndContainerIdForHttp(req.RemoteAddr, req.Host, segment.Service, segment.ServiceInstance, "")
 	}
 	ptd := ProtoToTraces(segment, pid, containerId)
 
@@ -125,7 +125,7 @@ func (r *Receiver) consumeTraces(ctx context.Context, segment *agent.SegmentObje
 		containerId string
 	)
 	if r.FillProcExtension != nil {
-		pid, containerId = r.FillProcExtension.GetMatchPidAndContainerId(ctx)
+		pid, containerId = r.FillProcExtension.GetMatchPidAndContainerId(ctx, segment.Service, segment.ServiceInstance, "")
 	}
 	ptd := ProtoToTraces(segment, pid, containerId)
 

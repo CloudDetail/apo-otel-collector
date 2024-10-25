@@ -68,7 +68,7 @@ func (p *SocketProcExtension) Shutdown(context.Context) error {
 	return nil
 }
 
-func (p *SocketProcExtension) GetMatchPidAndContainerId(ctx context.Context) (int, string) {
+func (p *SocketProcExtension) GetMatchPidAndContainerId(ctx context.Context, serviceName string, instanceId string, sdkName string) (int, string) {
 	if !p.enable {
 		return 0, ""
 	}
@@ -76,17 +76,27 @@ func (p *SocketProcExtension) GetMatchPidAndContainerId(ctx context.Context) (in
 	if !ok {
 		return 0, ""
 	}
-	return p.getMatchPidAndContainerId(peerAddr.Addr.String(), peerAddr.LocalAddr.String())
+	return p.getMatchPidAndContainerId(peerAddr.Addr.String(), peerAddr.LocalAddr.String(), serviceName, instanceId, sdkName)
 }
 
-func (p *SocketProcExtension) GetMatchPidAndContainerIdForHttp(peerAddr string, serverAddr string) (int, string) {
+func (p *SocketProcExtension) GetMatchPidAndContainerIdForHttp(peerAddr string, serverAddr string, serviceName string, instanceId string, sdkName string) (int, string) {
 	if !p.enable || len(peerAddr) == 0 || len(serverAddr) == 0 {
 		return 0, ""
 	}
-	return p.getMatchPidAndContainerId(peerAddr, serverAddr)
+	return p.getMatchPidAndContainerId(peerAddr, serverAddr, serviceName, instanceId, sdkName)
 }
 
-func (p *SocketProcExtension) getMatchPidAndContainerId(peerAddr string, serverAddr string) (int, string) {
+func (p *SocketProcExtension) getMatchPidAndContainerId(peerAddr string, serverAddr string, serviceName string, instanceId string, sdkName string) (int, string) {
+	if sdkName == "beyla" {
+		if pid, err := strconv.Atoi(instanceId[strings.LastIndex(instanceId, "-")+1:]); err == nil {
+			return pid, p.cache.GetContainerIdByPid(pid)
+		}
+	}
+
+	if matchedProc := p.cache.GetProcByServiceInstance(serviceName, instanceId); matchedProc != nil {
+		return matchedProc.ProcessID, matchedProc.ContainerId
+	}
+
 	peer := peerAddr
 	if strings.HasPrefix(peer, "[::1]:") {
 		peer = fmt.Sprintf("::1:%s", peer[6:])
@@ -102,11 +112,12 @@ func (p *SocketProcExtension) getMatchPidAndContainerId(peerAddr string, serverA
 	if _, exist := p.cache.ToMapSockets.Load(peer); !exist {
 		port, _ := strconv.Atoi(serverAddr[strings.LastIndex(serverAddr, ":")+1:])
 		// 记录Peer到待关联列表
-		p.cache.ToMapSockets.Store(peer, port)
+		p.cache.ToMapSockets.Store(peer, &ToMatchData{
+			Peer:       peer,
+			Port:       port,
+			Service:    serviceName,
+			InstanceId: instanceId,
+		})
 	}
 	return 0, ""
-}
-
-func (p *SocketProcExtension) GetContainerIdByPid(pid int) string {
-	return p.cache.GetContainerIdByPid(pid)
 }

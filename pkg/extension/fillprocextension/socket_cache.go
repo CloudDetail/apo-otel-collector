@@ -1,6 +1,7 @@
 package fillprocextension
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension/internal/proc"
@@ -11,8 +12,9 @@ type SocketCache struct {
 	logger           *zap.Logger
 	activeProcNum    int
 	Procs            sync.Map // <int, *proc.ProcInfo>
-	ToMapSockets     sync.Map // <peerSocket, int>
+	ToMapSockets     sync.Map // <peerSocket, *ToMatchData>
 	CachedSockets    sync.Map // <peerSocket, *ProcInfo
+	CachedProcs      sync.Map // <service-instanceId, *ProcInfo>
 	HostNetNamespace string
 }
 
@@ -25,8 +27,11 @@ func newSocketCache(logger *zap.Logger) *SocketCache {
 
 func (c *SocketCache) mapSocketToPids() {
 	toMatchPeers := make(map[string]int)
+	toRelateInstances := make([]*ToMatchData, 0)
 	c.ToMapSockets.Range(func(k, v interface{}) bool {
-		toMatchPeers[k.(string)] = v.(int)
+		toMatchData := v.(*ToMatchData)
+		toMatchPeers[k.(string)] = toMatchData.Port
+		toRelateInstances = append(toRelateInstances, toMatchData)
 		// 清理待匹配peers
 		c.ToMapSockets.Delete(k)
 		return true
@@ -45,16 +50,26 @@ func (c *SocketCache) mapSocketToPids() {
 		}
 
 		result := c.matchSockets(toMatchPeers)
-		for peer, matchedProc := range result {
-			if matchedProc != nil {
+		for _, toRelate := range toRelateInstances {
+			if matchedProc, found := result[toRelate.Peer]; found {
 				c.logger.Info("Match Socket",
-					zap.String("peer", peer),
+					zap.String("peer", toRelate.Peer),
 					zap.Int("pid", matchedProc.ProcessID),
 					zap.String("host", matchedProc.HostName),
 					zap.String("Comm", matchedProc.Comm),
 					zap.String("ContainerId", matchedProc.ContainerId),
+					zap.String("service", toRelate.Service),
+					zap.String("instanceId", toRelate.InstanceId),
 				)
-				c.CachedSockets.Store(peer, matchedProc)
+				c.CachedSockets.Store(toRelate.Peer, matchedProc)
+				c.RelateServiceInstance(toRelate.Service, toRelate.InstanceId, matchedProc)
+			} else {
+				c.logger.Warn("NotMatch Socket",
+					zap.String("peer", toRelate.Peer),
+					zap.Int("port", toRelate.Port),
+					zap.String("service", toRelate.Service),
+					zap.String("instanceId", toRelate.InstanceId),
+				)
 			}
 		}
 	}
@@ -145,13 +160,6 @@ func (c *SocketCache) matchSockets(peers map[string]int) map[string]*proc.ProcIn
 			}
 			return true
 		})
-
-		for peer, serverPort := range peers {
-			c.logger.Warn("NotMatch Socket",
-				zap.String("peer", peer),
-				zap.Int("port", serverPort),
-			)
-		}
 	}
 	return result
 }
@@ -161,4 +169,54 @@ func (c *SocketCache) GetContainerIdByPid(pid int) string {
 		return procInfoInterface.(*proc.ProcInfo).ContainerId
 	}
 	return ""
+}
+
+func (c *SocketCache) GetProcByServiceInstance(service string, instanceId string) *proc.ProcInfo {
+	if service == "" || instanceId == "" {
+		return nil
+	}
+	key := fmt.Sprintf("%s-%s", service, instanceId)
+	if procInterface, ok := c.CachedProcs.Load(key); ok {
+		return procInterface.(*proc.ProcInfo)
+	}
+	return nil
+}
+
+func (c *SocketCache) RelateServiceInstance(service string, instanceId string, procInfo *proc.ProcInfo) {
+	if service == "" || instanceId == "" {
+		c.logger.Warn("Ignore Relate Service Instance",
+			zap.String("service", service),
+			zap.String("instanceId", instanceId),
+		)
+		return
+	}
+	key := fmt.Sprintf("%s-%s", service, instanceId)
+	if procInterface, ok := c.CachedProcs.Load(key); ok {
+		existProc := procInterface.(*proc.ProcInfo)
+
+		c.logger.Warn("Skip Relate Service Instance",
+			zap.String("service", service),
+			zap.String("instanceId", instanceId),
+			zap.Int("pid", procInfo.ProcessID),
+			zap.String("containerId", procInfo.ContainerId),
+			zap.Int("stored.pid", existProc.ProcessID),
+			zap.String("stored.containerId", existProc.ContainerId),
+		)
+	} else {
+		c.CachedProcs.Store(key, procInfo)
+
+		c.logger.Warn("Relate Service Instance",
+			zap.String("service", service),
+			zap.String("instanceId", instanceId),
+			zap.Int("pid", procInfo.ProcessID),
+			zap.String("containerId", procInfo.ContainerId),
+		)
+	}
+}
+
+type ToMatchData struct {
+	Peer       string
+	Port       int
+	Service    string
+	InstanceId string
 }

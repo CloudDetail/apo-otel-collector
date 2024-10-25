@@ -6,13 +6,10 @@ package trace // import "github.com/CloudDetail/apo-otel-collector/pkg/receiver/
 import (
 	"context"
 	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/CloudDetail/apo-otel-collector/pkg/fillproc"
 	"github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver/internal/errors"
 	"go.opentelemetry.io/collector/consumer"
-	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace/ptraceotlp"
 	"go.opentelemetry.io/collector/receiver/receiverhelper"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
@@ -46,23 +43,15 @@ func (r *Receiver) Export(ctx context.Context, req ptraceotlp.ExportRequest) (pt
 		return ptraceotlp.NewExportResponse(), nil
 	}
 
-	var (
-		pid         int
-		containerId string
-	)
-	if r.fillProcExtension != nil {
-		pid, containerId = r.fillProcExtension.GetMatchPidAndContainerId(ctx)
-	}
 	ctx = r.obsreport.StartTracesOp(ctx)
 
 	for i := 0; i < td.ResourceSpans().Len(); i++ {
 		resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
-		if beylaPid := getBeylaPid(resourceAttr); beylaPid > 0 {
-			pid = beylaPid
-			if r.fillProcExtension != nil {
-				containerId = r.fillProcExtension.GetContainerIdByPid(pid)
-			}
-		}
+
+		sdkName, _ := resourceAttr.Get(conventions.AttributeTelemetrySDKName)
+		serviceName, _ := resourceAttr.Get(conventions.AttributeServiceName)
+		serviceInstanceId, _ := resourceAttr.Get(conventions.AttributeServiceInstanceID)
+		pid, containerId := r.fillProcExtension.GetMatchPidAndContainerId(ctx, serviceName.Str(), serviceInstanceId.Str(), sdkName.Str())
 		if pid > 0 {
 			resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
 		}
@@ -86,19 +75,6 @@ func (r *Receiver) Export(ctx context.Context, req ptraceotlp.ExportRequest) (pt
 	return ptraceotlp.NewExportResponse(), nil
 }
 
-func getBeylaPid(attributes pcommon.Map) int {
-	if sdkName, sdkExist := attributes.Get(conventions.AttributeTelemetrySDKName); sdkExist && sdkName.Str() != "beyla" {
-		return 0
-	}
-	if serviceInstanceId, instanceExist := attributes.Get(conventions.AttributeServiceInstanceID); instanceExist {
-		instanceId := serviceInstanceId.Str()
-		if pid, err := strconv.Atoi(instanceId[strings.LastIndex(instanceId, "-")+1:]); err == nil {
-			return pid
-		}
-	}
-	return 0
-}
-
 // Export implements the service Export traces func.
 func (r *Receiver) ExportHttp(httpReq *http.Request, req ptraceotlp.ExportRequest) (ptraceotlp.ExportResponse, error) {
 	td := req.Traces()
@@ -109,24 +85,16 @@ func (r *Receiver) ExportHttp(httpReq *http.Request, req ptraceotlp.ExportReques
 	}
 
 	ctx := httpReq.Context()
-	var (
-		pid         int
-		containerId string
-	)
-	if r.fillProcExtension != nil {
-		pid, containerId = r.fillProcExtension.GetMatchPidAndContainerIdForHttp(httpReq.RemoteAddr, httpReq.Host)
-	}
 
 	ctx = r.obsreport.StartTracesOp(ctx)
 
 	for i := 0; i < td.ResourceSpans().Len(); i++ {
 		resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
-		if beylaPid := getBeylaPid(resourceAttr); beylaPid > 0 {
-			pid = beylaPid
-			if r.fillProcExtension != nil {
-				containerId = r.fillProcExtension.GetContainerIdByPid(pid)
-			}
-		}
+
+		sdkName, _ := resourceAttr.Get(conventions.AttributeTelemetrySDKName)
+		serviceName, _ := resourceAttr.Get(conventions.AttributeServiceName)
+		serviceInstanceId, _ := resourceAttr.Get(conventions.AttributeServiceInstanceID)
+		pid, containerId := r.fillProcExtension.GetMatchPidAndContainerIdForHttp(httpReq.RemoteAddr, httpReq.Host, serviceName.Str(), serviceInstanceId.Str(), sdkName.Str())
 		if pid > 0 {
 			resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
 		}
