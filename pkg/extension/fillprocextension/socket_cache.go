@@ -106,11 +106,13 @@ func (c *SocketCache) matchSockets(peers map[string]int) map[string]*proc.ProcIn
 				// 不分析Ignore
 				return true
 			}
-			if matchPeer := procInfo.GetMatchNetSocket(socks); matchPeer != "" {
-				result[matchPeer] = procInfo
-				// 移除peers，减少后续检索
-				delete(socks, matchPeer)
-				delete(peers, matchPeer)
+			if matchPeers := procInfo.GetMatchNetSockets(socks); len(matchPeers) > 0 {
+				for _, matchPeer := range matchPeers {
+					result[matchPeer] = procInfo
+					// 移除peers，减少后续检索
+					delete(socks, matchPeer)
+					delete(peers, matchPeer)
+				}
 			}
 			if len(socks) == 0 {
 				return false
@@ -132,10 +134,12 @@ func (c *SocketCache) matchSockets(peers map[string]int) map[string]*proc.ProcIn
 			}
 			// 容器网络场景，分析每个PID的tcp数据
 			if socks, err := procInfo.ListMatchNetSocks(peers); err == nil && len(socks) > 0 {
-				for peer := range socks {
-					result[peer] = procInfo
-					// 移除peers，减少后续检索
-					delete(peers, peer)
+				if matchPeers := procInfo.GetMatchNetSockets(socks); len(matchPeers) > 0 {
+					for _, matchPeer := range matchPeers {
+						result[matchPeer] = procInfo
+						// 移除peers，减少后续检索
+						delete(peers, matchPeer)
+					}
 				}
 			}
 

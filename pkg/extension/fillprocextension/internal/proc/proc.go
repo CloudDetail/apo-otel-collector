@@ -72,12 +72,13 @@ func (p *ProcInfo) ListMatchNetSocks(peers map[string]int) (map[string]*SockTabE
 	return result, nil
 }
 
-func (p *ProcInfo) GetMatchNetSocket(socks map[string]*SockTabEntry) string {
+func (p *ProcInfo) GetMatchNetSockets(socks map[string]*SockTabEntry) []string {
 	dirs, err := os.ReadDir(Path(p.ProcessID, "fd"))
 	if err != nil {
-		return ""
+		return nil
 	}
 
+	matchPeers := make([]string, 0)
 	for _, di := range dirs {
 		if di.IsDir() {
 			continue
@@ -89,11 +90,11 @@ func (p *ProcInfo) GetMatchNetSocket(socks map[string]*SockTabEntry) string {
 		for peer, sock := range socks {
 			ss := PREFIX_SOCKET + sock.Ino + "]"
 			if ss == lname {
-				return peer
+				matchPeers = append(matchPeers, peer)
 			}
 		}
 	}
-	return ""
+	return matchPeers
 }
 
 func ListVMMatchNetSocks(peers map[string]int) (map[string]*SockTabEntry, error) {
