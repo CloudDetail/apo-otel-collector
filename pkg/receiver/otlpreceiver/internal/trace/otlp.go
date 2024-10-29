@@ -57,18 +57,7 @@ func (r *Receiver) Export(ctx context.Context, req ptraceotlp.ExportRequest) (pt
 
 	for i := 0; i < td.ResourceSpans().Len(); i++ {
 		resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
-		if beylaPid := getBeylaPid(resourceAttr); beylaPid > 0 {
-			pid = beylaPid
-			if r.fillProcExtension != nil {
-				containerId = r.fillProcExtension.GetContainerIdByPid(pid)
-			}
-		}
-		if pid > 0 {
-			resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
-		}
-		if containerId != "" {
-			resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
-		}
+		r.fillPidAndContainerId(resourceAttr, pid, containerId)
 	}
 	err := r.nextConsumer.ConsumeTraces(ctx, td)
 	r.obsreport.EndTracesOp(ctx, dataFormatProtobuf, numSpans, err)
@@ -99,6 +88,13 @@ func getBeylaPid(attributes pcommon.Map) int {
 	return 0
 }
 
+func getContainerId(attributes pcommon.Map) string {
+	if containerId, exist := attributes.Get(conventions.AttributeContainerID); exist {
+		return containerId.Str()
+	}
+	return ""
+}
+
 // Export implements the service Export traces func.
 func (r *Receiver) ExportHttp(httpReq *http.Request, req ptraceotlp.ExportRequest) (ptraceotlp.ExportResponse, error) {
 	td := req.Traces()
@@ -121,18 +117,7 @@ func (r *Receiver) ExportHttp(httpReq *http.Request, req ptraceotlp.ExportReques
 
 	for i := 0; i < td.ResourceSpans().Len(); i++ {
 		resourceAttr := td.ResourceSpans().At(i).Resource().Attributes()
-		if beylaPid := getBeylaPid(resourceAttr); beylaPid > 0 {
-			pid = beylaPid
-			if r.fillProcExtension != nil {
-				containerId = r.fillProcExtension.GetContainerIdByPid(pid)
-			}
-		}
-		if pid > 0 {
-			resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
-		}
-		if containerId != "" {
-			resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
-		}
+		r.fillPidAndContainerId(resourceAttr, pid, containerId)
 	}
 	err := r.nextConsumer.ConsumeTraces(ctx, td)
 	r.obsreport.EndTracesOp(ctx, dataFormatProtobuf, numSpans, err)
@@ -148,4 +133,35 @@ func (r *Receiver) ExportHttp(httpReq *http.Request, req ptraceotlp.ExportReques
 	}
 
 	return ptraceotlp.NewExportResponse(), nil
+}
+
+func (r *Receiver) fillPidAndContainerId(resourceAttr pcommon.Map, pid int, containerId string) {
+	if beylaPid := getBeylaPid(resourceAttr); beylaPid > 0 {
+		pid = beylaPid
+		if r.fillProcExtension != nil {
+			containerId = r.fillProcExtension.GetContainerIdByPid(pid)
+		}
+		if pid > 0 {
+			resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
+		}
+		if containerId != "" {
+			resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
+		}
+	} else {
+		if resContainerId := getContainerId(resourceAttr); resContainerId != "" {
+			if containerId != "" && resContainerId == containerId && pid > 0 {
+				// FIX 存在网络挟持时containerId不匹配则过滤
+				resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
+				resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
+			}
+		} else {
+			if pid > 0 {
+				resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
+			}
+			if containerId != "" {
+				// Python等Otel探针缺失containerId信息，此处补充
+				resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
+			}
+		}
+	}
 }
