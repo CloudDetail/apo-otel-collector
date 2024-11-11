@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,8 +44,23 @@ const (
 	keyDbSystem = "db_system"
 	keyDbName   = "db_name"
 	keyDbUrl    = "db_url"
+	keyAddress  = "address"
+	keyRole     = "role"
 
 	AttributeSkywalkingSpanID = "sw8.span_id"
+
+	AttributeHttpMethod        = "http.method"         // 1.x
+	AttributeHttpRequestMethod = "http.request.method" // 2.x
+
+	AttributeNetPeerName   = "net.peer.name"  // 1.x
+	AttributeNetPeerPort   = "net.peer.port"  // 1.x
+	AttributeServerAddress = "server.address" // 2.x
+	AttributeServerPort    = "server.port"    // 2.x
+
+	AttributeNetSockPeerAddr    = "net.sock.peer.addr"   // 1.x
+	AttributeNetSockPeerPort    = "net.sock.peer.port"   // 1.x
+	AttributeNetworkPeerAddress = "network.peer.address" // 2.x
+	AttributeNetworkPeerPort    = "network.peer.port"    // 2.x
 )
 
 type metricKey string
@@ -61,15 +77,19 @@ type connectorImp struct {
 	nodeIp   string
 
 	// Histogram.
-	serverHistograms map[metricKey]*cache.Histogram // 服务 指标
-	dbCallHistograms map[metricKey]*cache.Histogram // db 指标
+	serverHistograms       map[metricKey]*cache.Histogram // 服务 指标
+	dbCallHistograms       map[metricKey]*cache.Histogram // db 指标
+	externalCallHistograms map[metricKey]*cache.Histogram // external 指标
+	mqCallHistograms       map[metricKey]*cache.Histogram // mq 指标
 
 	keyValue *ReusedKeyValue
 
 	// An LRU cache of dimension key-value maps keyed by a unique identifier formed by a concatenation of its values:
 	// e.g. { "foo/barOK": { "serviceName": "foo", "operation": "/bar", "status_code": "OK" }}
-	metricKeyToDimensions       *cache.Cache[metricKey, pcommon.Map]
-	dbCallMetricKeyToDimensions *cache.Cache[metricKey, pcommon.Map]
+	metricKeyToDimensions             *cache.Cache[metricKey, pcommon.Map]
+	dbCallMetricKeyToDimensions       *cache.Cache[metricKey, pcommon.Map]
+	externalCallMetricKeyToDimensions *cache.Cache[metricKey, pcommon.Map]
+	mqCallMetricKeyToDimensions       *cache.Cache[metricKey, pcommon.Map]
 
 	ticker  *clock.Ticker
 	done    chan struct{}
@@ -103,6 +123,15 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		return nil, err
 	}
 
+	externalMetricKeyToDimensionsCache, err := cache.NewCache[metricKey, pcommon.Map](pConfig.DimensionsCacheSize)
+	if err != nil {
+		return nil, err
+	}
+
+	mqMetricKeyToDimensionsCache, err := cache.NewCache[metricKey, pcommon.Map](pConfig.DimensionsCacheSize)
+	if err != nil {
+		return nil, err
+	}
 	return &connectorImp{
 		logger:                                 logger,
 		config:                                 *pConfig,
@@ -110,9 +139,13 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		nodeIp:                                 getNodeIp(),
 		serverHistograms:                       make(map[metricKey]*cache.Histogram),
 		dbCallHistograms:                       make(map[metricKey]*cache.Histogram),
+		externalCallHistograms:                 make(map[metricKey]*cache.Histogram),
+		mqCallHistograms:                       make(map[metricKey]*cache.Histogram),
 		keyValue:                               newKeyValue(100), // 最大100的KeyValue 可重用Map
 		metricKeyToDimensions:                  metricKeyToDimensionsCache,
 		dbCallMetricKeyToDimensions:            dbMetricKeyToDimensionsCache,
+		externalCallMetricKeyToDimensions:      externalMetricKeyToDimensionsCache,
+		mqCallMetricKeyToDimensions:            mqMetricKeyToDimensionsCache,
 		ticker:                                 ticker,
 		done:                                   make(chan struct{}),
 		serviceToOperations:                    make(map[string]map[string]struct{}),
@@ -202,9 +235,17 @@ func (p *connectorImp) buildMetrics() (pmetric.Metrics, error) {
 	if err := collectLatencyMetrics(ilm, p.dbCallMetricKeyToDimensions, p.dbCallHistograms, "kindling_db_duration_nanoseconds"); err != nil {
 		return pmetric.Metrics{}, err
 	}
+	if err := collectLatencyMetrics(ilm, p.externalCallMetricKeyToDimensions, p.externalCallHistograms, "kindling_external_duration_nanoseconds"); err != nil {
+		return pmetric.Metrics{}, err
+	}
+	if err := collectLatencyMetrics(ilm, p.mqCallMetricKeyToDimensions, p.mqCallHistograms, "kindling_mq_duration_nanoseconds"); err != nil {
+		return pmetric.Metrics{}, err
+	}
 
 	p.metricKeyToDimensions.RemoveEvictedItems()
 	p.dbCallMetricKeyToDimensions.RemoveEvictedItems()
+	p.externalCallMetricKeyToDimensions.RemoveEvictedItems()
+	p.mqCallMetricKeyToDimensions.RemoveEvictedItems()
 
 	for key := range p.serverHistograms {
 		if !p.metricKeyToDimensions.Contains(key) {
@@ -214,6 +255,16 @@ func (p *connectorImp) buildMetrics() (pmetric.Metrics, error) {
 	for key := range p.dbCallHistograms {
 		if !p.dbCallMetricKeyToDimensions.Contains(key) {
 			delete(p.dbCallHistograms, key)
+		}
+	}
+	for key := range p.externalCallHistograms {
+		if !p.dbCallMetricKeyToDimensions.Contains(key) {
+			delete(p.externalCallHistograms, key)
+		}
+	}
+	for key := range p.mqCallHistograms {
+		if !p.mqCallMetricKeyToDimensions.Contains(key) {
+			delete(p.mqCallHistograms, key)
 		}
 	}
 	return m, nil
@@ -337,47 +388,90 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 		}
 	}
 
-	if p.config.DbEnabled && span.Kind() != ptrace.SpanKindServer {
-		spanAttr := span.Attributes()
-		dbSystemAttr, systemExist := spanAttr.Get(conventions.AttributeDBSystem)
-		dbOperateAttr, operateExist := spanAttr.Get(conventions.AttributeDBOperation)
-		dbTableAttr, tableExist := spanAttr.Get(conventions.AttributeDBSQLTable)
-		dbUrlAttr, urlExist := spanAttr.Get(conventions.AttributeDBConnectionString)
-		if !tableExist || !operateExist {
-			if dbStatement, sqlExist := spanAttr.Get(conventions.AttributeDBStatement); sqlExist {
-				operation, table := sqlprune.SQLParseOperationAndTableNEW(dbStatement.Str())
-				if operation != "" {
-					if !operateExist {
-						operateExist = true
-						dbOperateAttr = pcommon.NewValueStr(operation)
-					}
-					if !tableExist {
-						tableExist = true
-						dbTableAttr = pcommon.NewValueStr(table)
-					}
+	spanAttr := span.Attributes()
+	if span.Kind() == ptrace.SpanKindClient {
+		if p.config.DbEnabled {
+			if dbSystemAttr, systemExist := spanAttr.Get(conventions.AttributeDBSystem); systemExist {
+				dbSystem := dbSystemAttr.Str()
+				name := ""
+				if dbSystem == "redis" || dbSystem == "memcached" || dbSystem == "aerospike" {
+					name = span.Name()
 				} else {
-					url := ""
-					if urlExist {
-						url = dbUrlAttr.Str()
+					dbOperateAttr, operateExist := spanAttr.Get(conventions.AttributeDBOperation)
+					dbTableAttr, tableExist := spanAttr.Get(conventions.AttributeDBSQLTable)
+					if !tableExist || !operateExist {
+						if dbStatement, sqlExist := spanAttr.Get(conventions.AttributeDBStatement); sqlExist {
+							operation, table := sqlprune.SQLParseOperationAndTableNEW(dbStatement.Str())
+							if operation != "" {
+								dbOperateAttr, operateExist = pcommon.NewValueStr(operation), true
+								dbTableAttr, tableExist = pcommon.NewValueStr(table), true
+							} else {
+								p.logger.Info("Drop SQL by parse failed",
+									zap.String("span", span.Name()),
+									zap.String("type", dbSystem),
+									zap.String("sql", dbStatement.Str()),
+								)
+							}
+						}
 					}
-					p.logger.Info("Drop SQL by parse failed",
-						zap.String("span", span.Name()),
-						zap.String("sql", dbStatement.Str()),
-						zap.String("url", url),
-					)
+					if tableExist && operateExist {
+						name = fmt.Sprintf("%s %s", dbOperateAttr.Str(), dbTableAttr.Str())
+					}
+				}
+
+				if name != "" {
+					p.keyValue.reset()
+					dbAddress := getClientPeer(spanAttr, dbSystem, "unknown")
+					dbName := getAttrValueWithDefault(spanAttr, conventions.AttributeDBName, "")
+					dbError := span.Status().Code() == ptrace.StatusCodeError
+					dbCallKey := metricKey(p.buildDbKey(pid, containerId, serviceName, dbSystem, dbName, name, dbAddress, dbError))
+					if _, has := p.dbCallMetricKeyToDimensions.Get(dbCallKey); !has {
+						p.dbCallMetricKeyToDimensions.Add(dbCallKey, p.keyValue.GetMap())
+					}
+					updateHistogram(p.dbCallHistograms, dbCallKey, latencyInNanoseconds)
 				}
 			}
 		}
 
-		if systemExist && operateExist && tableExist && urlExist {
-			p.keyValue.reset()
-			dbName := getAttrValueWithDefault(spanAttr, conventions.AttributeDBName, "")
-			dbError := span.Status().Code() == ptrace.StatusCodeError
-			dbCallKey := metricKey(p.buildDbKey(pid, containerId, serviceName, dbSystemAttr.Str(), dbName, dbOperateAttr.Str(), dbTableAttr.Str(), dbUrlAttr.Str(), dbError))
-			if _, has := p.dbCallMetricKeyToDimensions.Get(dbCallKey); !has {
-				p.dbCallMetricKeyToDimensions.Add(dbCallKey, p.keyValue.GetMap())
+		if p.config.ExternalEnabled {
+			if httpMethod := getHttpMethod(spanAttr); httpMethod != "" {
+				p.keyValue.reset()
+				httpAddress := getClientPeer(spanAttr, "http", "")
+				httpError := span.Status().Code() == ptrace.StatusCodeError
+				httpCallKey := metricKey(p.buildExternalKey(pid, containerId, serviceName, httpMethod, httpAddress, httpError))
+				if _, has := p.externalCallMetricKeyToDimensions.Get(httpCallKey); !has {
+					p.externalCallMetricKeyToDimensions.Add(httpCallKey, p.keyValue.GetMap())
+				}
+				updateHistogram(p.externalCallHistograms, httpCallKey, latencyInNanoseconds)
+			} else if rpcSystemAttr, systemExist := spanAttr.Get(conventions.AttributeRPCSystem); systemExist {
+				p.keyValue.reset()
+				protocol := rpcSystemAttr.Str()
+				// apache_dubbo => dubbo
+				if index := strings.LastIndex(protocol, "_"); index != -1 {
+					protocol = protocol[index+1:]
+				}
+				rpcAddress := getClientPeer(spanAttr, protocol, "")
+				rpcError := span.Status().Code() == ptrace.StatusCodeError
+				rpcCallKey := metricKey(p.buildExternalKey(pid, containerId, serviceName, span.Name(), rpcAddress, rpcError))
+				if _, has := p.externalCallMetricKeyToDimensions.Get(rpcCallKey); !has {
+					p.externalCallMetricKeyToDimensions.Add(rpcCallKey, p.keyValue.GetMap())
+				}
+				updateHistogram(p.externalCallHistograms, rpcCallKey, latencyInNanoseconds)
 			}
-			updateHistogram(p.dbCallHistograms, dbCallKey, latencyInNanoseconds)
+		}
+	}
+
+	if p.config.MqEnabled && (span.Kind() == ptrace.SpanKindProducer || span.Kind() == ptrace.SpanKindConsumer) {
+		if mqSystemAttr, systemExist := spanAttr.Get(conventions.AttributeMessagingSystem); systemExist {
+			p.keyValue.reset()
+			mqAddress := getClientPeer(spanAttr, mqSystemAttr.Str(), mqSystemAttr.Str())
+			mqError := span.Status().Code() == ptrace.StatusCodeError
+			mqRole := strings.ToLower(span.Kind().String())
+			mqCallKey := metricKey(p.buildMqKey(pid, containerId, serviceName, span.Name(), mqAddress, mqError, mqRole))
+			if _, has := p.mqCallMetricKeyToDimensions.Get(mqCallKey); !has {
+				p.mqCallMetricKeyToDimensions.Add(mqCallKey, p.keyValue.GetMap())
+			}
+			updateHistogram(p.mqCallHistograms, mqCallKey, latencyInNanoseconds)
 		}
 	}
 }
@@ -412,15 +506,44 @@ func (p *connectorImp) buildKey(pid string, containerId string, serviceName stri
 	return p.keyValue.GetValue()
 }
 
-// buildDbKey DB Red指标
-func (p *connectorImp) buildDbKey(pid string, containerId string, serviceName string, dbSystem string, dbName string, dbOperate string, dbTable string, dbUrl string, isError bool) string {
+// buildExternalKey Http/Rpc Red指标
+func (p *connectorImp) buildExternalKey(pid string, containerId string, serviceName string, name string, peer string, isError bool) string {
 	p.keyValue.
 		Add(keyServiceName, serviceName).
 		Add(keyNodeName, p.nodeName).
 		Add(keyNodeIp, p.nodeIp).
 		Add(keyPid, pid).
 		Add(keyContainerId, containerId).
-		Add(keyName, fmt.Sprintf("%s %s", dbOperate, dbTable)).
+		Add(keyName, name).
+		Add(keyAddress, peer).
+		Add(keyIsError, strconv.FormatBool(isError))
+	return p.keyValue.GetValue()
+}
+
+// buildMqKey ActiveMq / RabbitMq / RocketMq / Kafka Red指标
+func (p *connectorImp) buildMqKey(pid string, containerId string, serviceName string, name string, address string, isError bool, role string) string {
+	p.keyValue.
+		Add(keyServiceName, serviceName).
+		Add(keyNodeName, p.nodeName).
+		Add(keyNodeIp, p.nodeIp).
+		Add(keyPid, pid).
+		Add(keyContainerId, containerId).
+		Add(keyName, name).
+		Add(keyAddress, address).
+		Add(keyRole, role).
+		Add(keyIsError, strconv.FormatBool(isError))
+	return p.keyValue.GetValue()
+}
+
+// buildDbKey DB Red指标
+func (p *connectorImp) buildDbKey(pid string, containerId string, serviceName string, dbSystem string, dbName string, name string, dbUrl string, isError bool) string {
+	p.keyValue.
+		Add(keyServiceName, serviceName).
+		Add(keyNodeName, p.nodeName).
+		Add(keyNodeIp, p.nodeIp).
+		Add(keyPid, pid).
+		Add(keyContainerId, containerId).
+		Add(keyName, name).
 		Add(keyDbSystem, dbSystem).
 		Add(keyDbName, dbName).
 		Add(keyDbUrl, dbUrl).
@@ -434,6 +557,56 @@ func getAttrValueWithDefault(attr pcommon.Map, key string, defaultValue string) 
 	if exists {
 		return attrValue.AsString()
 	}
+	return defaultValue
+}
+
+func getHttpMethod(attr pcommon.Map) string {
+	// 1.x http.method
+	if httpMethod, found := attr.Get(AttributeHttpMethod); found {
+		return httpMethod.Str()
+	}
+	// 2.x http.request.method
+	if httpRequestMethod, found := attr.Get(AttributeHttpRequestMethod); found {
+		return httpRequestMethod.Str()
+	}
+	return ""
+}
+
+func getClientPeer(attr pcommon.Map, protocol string, defaultValue string) string {
+	// 1.x - redis、grpc、rabbitmq
+	if netSockPeerAddr, addrFound := attr.Get(AttributeNetSockPeerAddr); addrFound {
+		if netSockPeerPort, portFound := attr.Get(AttributeNetSockPeerPort); portFound {
+			return fmt.Sprintf("%s://%s:%s", protocol, netSockPeerAddr.Str(), netSockPeerPort.AsString())
+		} else {
+			return fmt.Sprintf("%s://%s", protocol, netSockPeerAddr.Str())
+		}
+	}
+	// 2.x - redis、grpc、rabbitmq
+	if networkPeerAddress, addrFound := attr.Get(AttributeNetworkPeerAddress); addrFound {
+		if networkPeerPort, portFound := attr.Get(AttributeNetworkPeerPort); portFound {
+			return fmt.Sprintf("%s://%s:%s", protocol, networkPeerAddress.Str(), networkPeerPort.AsString())
+		} else {
+			return fmt.Sprintf("%s://%s", protocol, networkPeerAddress.Str())
+		}
+	}
+
+	// 1.x - httpclient、db、dubbo
+	if peerName, peerFound := attr.Get(AttributeNetPeerName); peerFound {
+		if peerPort, peerPortFound := attr.Get(AttributeNetPeerPort); peerPortFound {
+			return fmt.Sprintf("%s://%s:%s", protocol, peerName.Str(), peerPort.AsString())
+		} else {
+			return fmt.Sprintf("%s://%s", protocol, peerName.Str())
+		}
+	}
+	// 2.x - httpclient、db、dubbo
+	if serverAddress, serverFound := attr.Get(AttributeServerAddress); serverFound {
+		if serverPort, serverPortFound := attr.Get(AttributeServerPort); serverPortFound {
+			return fmt.Sprintf("%s://%s:%s", protocol, serverAddress.Str(), serverPort.AsString())
+		} else {
+			return fmt.Sprintf("%s://%s", protocol, serverAddress.Str())
+		}
+	}
+
 	return defaultValue
 }
 

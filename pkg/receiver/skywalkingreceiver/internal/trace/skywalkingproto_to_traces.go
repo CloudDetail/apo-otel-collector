@@ -6,7 +6,6 @@ package trace // import "github.com/open-telemetry/opentelemetry-collector-contr
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +16,7 @@ import (
 	"github.com/google/uuid"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
-	conventions "go.opentelemetry.io/collector/semconv/v1.8.0"
+	conventions "go.opentelemetry.io/collector/semconv/v1.18.0"
 	common "skywalking.apache.org/repo/goapi/collect/common/v3"
 	agentV3 "skywalking.apache.org/repo/goapi/collect/language/agent/v3"
 )
@@ -30,7 +29,6 @@ const (
 	AttributeSkywalkingSpanID          = "sw8.span_id"
 	AttributeSkywalkingTraceID         = "sw8.trace_id"
 	AttributeSkywalkingSegmentID       = "sw8.segment_id"
-	AttributeSkywalkingComponmentID    = "sw8.componment_id"
 	AttributeSkywalkingParentSpanID    = "sw8.parent_span_id"
 	AttributeSkywalkingParentSegmentID = "sw8.parent_segment_id"
 	AttributeNetworkAddressUsedAtPeer  = "network.AddressUsedAtPeer"
@@ -39,9 +37,6 @@ const (
 var otSpanResourcesMapping = map[string]string{
 	"url":         conventions.AttributeHTTPURL,
 	"status_code": conventions.AttributeHTTPStatusCode,
-	"db.type":     conventions.AttributeDBSystem,
-	"db.instance": conventions.AttributeDBName,
-	"mq.broker":   conventions.AttributeNetPeerName,
 }
 
 var otSpanTagsMapping = map[string]string{
@@ -145,7 +140,6 @@ func swSpanToSpan(traceID string, segmentID string, span *agentV3.SpanObject, de
 		attrs.Clear()
 	}
 
-	attrs.PutInt(AttributeSkywalkingComponmentID, int64(span.ComponentId))
 	attrs.PutStr(AttributeSkywalkingSegmentID, segmentID)
 	setSwSpanIDToAttributes(span, attrs)
 	setInternalSpanStatus(span, dest.Status())
@@ -267,34 +261,102 @@ func swLogsToSpanEvents(logs []*agentV3.Log, dest ptrace.SpanEventSlice) {
 }
 
 func swToTags(span *agentV3.SpanObject, dest pcommon.Map) {
+	if span.SpanType == agentV3.SpanType_Exit {
+		dest.PutStr(conventions.AttributeNetPeerName, span.Peer)
+		if span.SpanLayer == agentV3.SpanLayer_RPCFramework {
+			dest.PutStr(conventions.AttributeRPCService, strings.ToLower(GetComponent(span.ComponentId)))
+		}
+	}
 	if span.Tags == nil {
 		return
 	}
 
-	dbType := ""
+	if span.SpanLayer == agentV3.SpanLayer_MQ {
+		if span.SpanType == agentV3.SpanType_Exit || span.SpanType == agentV3.SpanType_Entry {
+			dest.PutStr(conventions.AttributeMessagingSystem, strings.ToLower(GetComponent(span.ComponentId)))
+		}
+	}
+
 	for _, tag := range span.Tags {
-		otKey, ok := otSpanTagsMapping[tag.Key]
-		if !ok {
-			otKey = tag.Key
-		}
-		dest.PutStr(otKey, tag.Value)
+		if setCacheAttribute(dest, tag.Key, tag.Value, span.SpanType) &&
+			setDbAttribute(dest, tag.Key, tag.Value) &&
+			setMqAttribute(dest, tag.Key, tag.Value) {
 
-		if otKey == conventions.AttributeDBSystem {
-			dbType = tag.Value
+			if otKey, ok := otSpanTagsMapping[tag.Key]; ok {
+				dest.PutStr(otKey, tag.Value)
+			} else {
+				dest.PutStr(tag.Key, tag.Value)
+			}
 		}
+	}
+}
 
-		if otKey == conventions.AttributeDBStatement && len(tag.Value) > 0 {
-			operation, table := sqlprune.SQLParseOperationAndTableNEW(tag.Value)
-			if operation != "" {
+func setCacheAttribute(dest pcommon.Map, key string, value string, spanType agentV3.SpanType) bool {
+	if !strings.HasPrefix(key, "cache.") {
+		return true
+	}
+	if spanType == agentV3.SpanType_Local {
+		// EhCache...
+		dest.PutStr(key, value)
+	} else if key == "cache.type" {
+		// Redis...
+		// XMemcached -> memcached
+		dest.PutStr(conventions.AttributeDBSystem, strings.ToLower(GetServerName(value)))
+	} else if key == "cache.cmd" {
+		// Redis、Memcached
+		dest.PutStr(conventions.AttributeDBStatement, value)
+	} else if key == "cache.op" {
+		// Aerospike
+		dest.PutStr(conventions.AttributeDBOperation, value)
+	} else {
+		dest.PutStr(key, value)
+	}
+	return false
+}
+
+func setDbAttribute(dest pcommon.Map, key string, value string) bool {
+	if !strings.HasPrefix(key, "db.") {
+		return true
+	}
+	if key == "db.type" {
+		// Mysql...
+		dest.PutStr(conventions.AttributeDBSystem, strings.ToLower(value))
+	} else if key == "db.instance" {
+		dest.PutStr(conventions.AttributeDBName, value)
+	} else if key == "db.statement" {
+		dest.PutStr(conventions.AttributeDBStatement, value)
+		// 解析SQL语句
+		if value != "" {
+			if operation, table := sqlprune.SQLParseOperationAndTableNEW(value); operation != "" {
 				dest.PutStr(conventions.AttributeDBOperation, operation)
 				dest.PutStr(conventions.AttributeDBSQLTable, table)
 			}
 		}
+	} else {
+		dest.PutStr(key, value)
+	}
+	return false
+}
+
+func setMqAttribute(dest pcommon.Map, key string, value string) bool {
+	if !strings.HasPrefix(key, "mq.") {
+		return true
 	}
 
-	if dbType != "" && span.Peer != "" {
-		dest.PutStr(conventions.AttributeDBConnectionString, fmt.Sprintf("%s://%s", strings.ToLower(dbType), span.Peer))
+	if key == "mq.queue" {
+		dest.PutStr(conventions.AttributeMessagingDestinationName, value)
+	} else if key == "mq.topic" {
+		// 已赋值则不重新赋予
+		if _, exist := dest.Get(conventions.AttributeMessagingDestinationName); !exist {
+			dest.PutStr(conventions.AttributeMessagingDestinationName, value)
+		}
+	} else if key == "mq.broker" {
+		// MQ Consumer 未设置net.peer.name，此处通过通过mq.broker填充
+		dest.PutStr(conventions.AttributeNetPeerName, value)
+	} else {
+		dest.PutStr(key, value)
 	}
+	return false
 }
 
 func swKvPairsToInternalAttributes(pairs []*common.KeyStringValuePair, dest pcommon.Map) {
