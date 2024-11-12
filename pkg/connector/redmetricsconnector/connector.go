@@ -416,27 +416,27 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 					}
 					if tableExist && operateExist {
 						name = fmt.Sprintf("%s %s", dbOperateAttr.Str(), dbTableAttr.Str())
+					} else {
+						name = "unknown"
 					}
 				}
 
-				if name != "" {
-					p.keyValue.reset()
-					dbAddress := getClientPeer(spanAttr, dbSystem, "unknown")
-					dbName := getAttrValueWithDefault(spanAttr, conventions.AttributeDBName, "")
-					dbError := span.Status().Code() == ptrace.StatusCodeError
-					dbCallKey := metricKey(p.buildDbKey(pid, containerId, serviceName, dbSystem, dbName, name, dbAddress, dbError))
-					if _, has := p.dbCallMetricKeyToDimensions.Get(dbCallKey); !has {
-						p.dbCallMetricKeyToDimensions.Add(dbCallKey, p.keyValue.GetMap())
-					}
-					updateHistogram(p.dbCallHistograms, dbCallKey, latencyInNanoseconds)
+				p.keyValue.reset()
+				dbAddress := getClientPeer(spanAttr, dbSystem, "unknown")
+				dbName := getAttrValueWithDefault(spanAttr, conventions.AttributeDBName, "")
+				dbError := span.Status().Code() == ptrace.StatusCodeError
+				dbCallKey := metricKey(p.buildDbKey(pid, containerId, serviceName, dbSystem, dbName, name, dbAddress, dbError))
+				if _, has := p.dbCallMetricKeyToDimensions.Get(dbCallKey); !has {
+					p.dbCallMetricKeyToDimensions.Add(dbCallKey, p.keyValue.GetMap())
 				}
+				updateHistogram(p.dbCallHistograms, dbCallKey, latencyInNanoseconds)
 			}
 		}
 
 		if p.config.ExternalEnabled {
 			if httpMethod := getHttpMethod(spanAttr); httpMethod != "" {
 				p.keyValue.reset()
-				httpAddress := getClientPeer(spanAttr, "http", "")
+				httpAddress := getClientPeer(spanAttr, "http", "unknown")
 				httpError := span.Status().Code() == ptrace.StatusCodeError
 				httpCallKey := metricKey(p.buildExternalKey(pid, containerId, serviceName, httpMethod, httpAddress, httpError))
 				if _, has := p.externalCallMetricKeyToDimensions.Get(httpCallKey); !has {
@@ -450,18 +450,31 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 				if index := strings.LastIndex(protocol, "_"); index != -1 {
 					protocol = protocol[index+1:]
 				}
-				rpcAddress := getClientPeer(spanAttr, protocol, "")
+				rpcAddress := getClientPeer(spanAttr, protocol, "unknown")
 				rpcError := span.Status().Code() == ptrace.StatusCodeError
 				rpcCallKey := metricKey(p.buildExternalKey(pid, containerId, serviceName, span.Name(), rpcAddress, rpcError))
 				if _, has := p.externalCallMetricKeyToDimensions.Get(rpcCallKey); !has {
 					p.externalCallMetricKeyToDimensions.Add(rpcCallKey, p.keyValue.GetMap())
 				}
 				updateHistogram(p.externalCallHistograms, rpcCallKey, latencyInNanoseconds)
+			} else {
+				_, dbSystemExist := spanAttr.Get(conventions.AttributeDBSystem)
+				_, mqSystemExist := spanAttr.Get(conventions.AttributeMessagingSystem)
+				if !dbSystemExist && !mqSystemExist {
+					p.keyValue.reset()
+					unknownAddress := getClientPeer(spanAttr, "unknown", "unknown")
+					unknownError := span.Status().Code() == ptrace.StatusCodeError
+					unknonwCallKey := metricKey(p.buildExternalKey(pid, containerId, serviceName, span.Name(), unknownAddress, unknownError))
+					if _, has := p.externalCallMetricKeyToDimensions.Get(unknonwCallKey); !has {
+						p.externalCallMetricKeyToDimensions.Add(unknonwCallKey, p.keyValue.GetMap())
+					}
+					updateHistogram(p.externalCallHistograms, unknonwCallKey, latencyInNanoseconds)
+				}
 			}
 		}
 	}
 
-	if p.config.MqEnabled && (span.Kind() == ptrace.SpanKindProducer || span.Kind() == ptrace.SpanKindConsumer) {
+	if p.config.MqEnabled && (span.Kind() == ptrace.SpanKindClient || span.Kind() == ptrace.SpanKindProducer || span.Kind() == ptrace.SpanKindConsumer) {
 		if mqSystemAttr, systemExist := spanAttr.Get(conventions.AttributeMessagingSystem); systemExist {
 			p.keyValue.reset()
 			mqAddress := getClientPeer(spanAttr, mqSystemAttr.Str(), mqSystemAttr.Str())
