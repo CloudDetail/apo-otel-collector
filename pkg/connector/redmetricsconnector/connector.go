@@ -1,19 +1,15 @@
 package redmetricsconnector
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector/internal/cache"
 	"github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector/internal/parser"
 	"github.com/CloudDetail/apo-otel-collector/pkg/fillproc"
-	"github.com/CloudDetail/apo-otel-collector/pkg/sqlprune"
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -29,42 +25,7 @@ const (
 	overflowServiceName = "overflow_service"
 	overflowOperation   = "overflow_operation"
 
-	envNodeName = "MY_NODE_NAME"
-	envNodeIP   = "MY_NODE_IP"
-
-	keyServiceName = "svc_name"
-	keyContentKey  = "content_key"
-	keyNodeName    = "node_name"
-	keyNodeIp      = "node_ip"
-	keyTopSpan     = "top_span"
-	keyIsError     = "is_error"
-	keyPid         = "pid"
-	keyContainerId = "container_id"
-
-	keyName     = "name"
-	keyDbSystem = "db_system"
-	keyDbName   = "db_name"
-	keyDbUrl    = "db_url"
-	keyAddress  = "address"
-	keyRole     = "role"
-
 	AttributeSkywalkingSpanID = "sw8.span_id"
-
-	AttributeHttpMethod        = "http.method"         // 1.x
-	AttributeHttpRequestMethod = "http.request.method" // 2.x
-
-	AttributeHttpUrl = "http.url" // 1.x
-	AttributeUrlFull = "url.full" // 2.x
-
-	AttributeNetPeerName   = "net.peer.name"  // 1.x
-	AttributeNetPeerPort   = "net.peer.port"  // 1.x
-	AttributeServerAddress = "server.address" // 2.x
-	AttributeServerPort    = "server.port"    // 2.x
-
-	AttributeNetSockPeerAddr    = "net.sock.peer.addr"   // 1.x
-	AttributeNetSockPeerPort    = "net.sock.peer.port"   // 1.x
-	AttributeNetworkPeerAddress = "network.peer.address" // 2.x
-	AttributeNetworkPeerPort    = "network.peer.port"    // 2.x
 )
 
 type metricKey string
@@ -76,12 +37,14 @@ type connectorImp struct {
 
 	metricsConsumer consumer.Metrics
 
-	// 主机名
-	nodeName string
-	nodeIp   string
-
 	// The starting time of the data points.
 	startTimestamp pcommon.Timestamp
+
+	// Parser
+	dbParser   parser.Parser
+	httpParser parser.Parser
+	rpcParser  parser.Parser
+	mqParser   parser.Parser
 
 	// Histogram.
 	serverHistograms       map[metricKey]cache.Histogram // 服务 指标
@@ -90,7 +53,7 @@ type connectorImp struct {
 	mqCallHistograms       map[metricKey]cache.Histogram // mq 指标
 	bounds                 []float64
 
-	keyValue *ReusedKeyValue
+	keyValue *cache.ReusedKeyValue
 
 	// An LRU cache of dimension key-value maps keyed by a unique identifier formed by a concatenation of its values:
 	// e.g. { "foo/barOK": { "serviceName": "foo", "operation": "/bar", "status_code": "OK" }}
@@ -109,7 +72,6 @@ type connectorImp struct {
 	maxNumberOfServicesToTrack             int
 	maxNumberOfOperationsToTrackPerService int
 	metricsType                            cache.MetricsType
-	httpParser                             *parser.HttpParser
 }
 
 var (
@@ -158,15 +120,17 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 	return &connectorImp{
 		logger:                                 logger,
 		config:                                 *pConfig,
-		nodeName:                               getNodeName(),
-		nodeIp:                                 getNodeIp(),
 		startTimestamp:                         pcommon.NewTimestampFromTime(time.Now()),
+		dbParser:                               parser.NewDbParser(),
+		httpParser:                             parser.NewHttpParser(pConfig.HttpParser),
+		rpcParser:                              parser.NewRpcParser(),
+		mqParser:                               parser.NewMqParser(),
 		serverHistograms:                       make(map[metricKey]cache.Histogram),
 		dbCallHistograms:                       make(map[metricKey]cache.Histogram),
 		externalCallHistograms:                 make(map[metricKey]cache.Histogram),
 		mqCallHistograms:                       make(map[metricKey]cache.Histogram),
 		bounds:                                 bounds,
-		keyValue:                               newKeyValue(100), // 最大100的KeyValue 可重用Map
+		keyValue:                               cache.NewReusedKeyValue(100), // 最大100的KeyValue 可重用Map
 		metricKeyToDimensions:                  metricKeyToDimensionsCache,
 		dbCallMetricKeyToDimensions:            dbMetricKeyToDimensionsCache,
 		externalCallMetricKeyToDimensions:      externalMetricKeyToDimensionsCache,
@@ -177,7 +141,6 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		maxNumberOfServicesToTrack:             pConfig.MaxServicesToTrack,
 		maxNumberOfOperationsToTrackPerService: pConfig.MaxOperationsToTrackPerService,
 		metricsType:                            cache.GetMetricsType(pConfig.MetricsType),
-		httpParser:                             parser.NewHttpParser(pConfig.HttpParser),
 	}, nil
 }
 
@@ -455,9 +418,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 		swSpanId, exist := span.Attributes().Get(AttributeSkywalkingSpanID)
 		// 过滤Skywalking Undertow task线程的SpringMVC Entry
 		if !exist || swSpanId.Int() == 0 {
-			// Always reset the buffer before re-using.
-			p.keyValue.reset()
-			key := metricKey(p.buildKey(pid, containerId, serviceName, span))
+			key := metricKey(p.buildServerKey(pid, containerId, serviceName, span))
 			if _, has := p.metricKeyToDimensions.Get(key); !has {
 				p.metricKeyToDimensions.Add(key, p.keyValue.GetMap())
 			}
@@ -468,41 +429,8 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 	spanAttr := span.Attributes()
 	if span.Kind() == ptrace.SpanKindClient {
 		if p.config.DbEnabled {
-			if dbSystemAttr, systemExist := spanAttr.Get(conventions.AttributeDBSystem); systemExist {
-				dbSystem := dbSystemAttr.Str()
-				name := ""
-				if dbSystem == "redis" || dbSystem == "memcached" || dbSystem == "aerospike" {
-					name = span.Name()
-				} else {
-					dbOperateAttr, operateExist := spanAttr.Get(conventions.AttributeDBOperation)
-					dbTableAttr, tableExist := spanAttr.Get(conventions.AttributeDBSQLTable)
-					if !tableExist || !operateExist {
-						if dbStatement, sqlExist := spanAttr.Get(conventions.AttributeDBStatement); sqlExist {
-							operation, table := sqlprune.SQLParseOperationAndTableNEW(dbStatement.Str())
-							if operation != "" {
-								dbOperateAttr, operateExist = pcommon.NewValueStr(operation), true
-								dbTableAttr, tableExist = pcommon.NewValueStr(table), true
-							} else {
-								p.logger.Info("Drop SQL by parse failed",
-									zap.String("span", span.Name()),
-									zap.String("type", dbSystem),
-									zap.String("sql", dbStatement.Str()),
-								)
-							}
-						}
-					}
-					if tableExist && operateExist {
-						name = fmt.Sprintf("%s %s", dbOperateAttr.Str(), dbTableAttr.Str())
-					} else {
-						name = "unknown"
-					}
-				}
-
-				p.keyValue.reset()
-				dbAddress := getClientPeer(spanAttr, dbSystem, "unknown")
-				dbName := getAttrValueWithDefault(spanAttr, conventions.AttributeDBName, "")
-				dbError := span.Status().Code() == ptrace.StatusCodeError
-				dbCallKey := metricKey(p.buildDbKey(pid, containerId, serviceName, dbSystem, dbName, name, dbAddress, dbError))
+			if dbKey := p.dbParser.Parse(p.logger, pid, containerId, serviceName, span, spanAttr, p.keyValue); dbKey != "" {
+				dbCallKey := metricKey(dbKey)
 				if _, has := p.dbCallMetricKeyToDimensions.Get(dbCallKey); !has {
 					p.dbCallMetricKeyToDimensions.Add(dbCallKey, p.keyValue.GetMap())
 				}
@@ -511,54 +439,36 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 		}
 
 		if p.config.ExternalEnabled {
-			if httpMethod := getHttpMethod(spanAttr); httpMethod != "" {
-				p.keyValue.reset()
-				httpAddress := getClientPeer(spanAttr, "http", "unknown")
-				httpError := span.Status().Code() == ptrace.StatusCodeError
-				httpName := p.httpParser.Parse(httpMethod, getHttpUrl(spanAttr))
-				httpCallKey := metricKey(p.buildExternalKey(pid, containerId, serviceName, httpName, httpAddress, httpError))
-				if _, has := p.externalCallMetricKeyToDimensions.Get(httpCallKey); !has {
-					p.externalCallMetricKeyToDimensions.Add(httpCallKey, p.keyValue.GetMap())
-				}
-				p.updateHistogram(p.externalCallHistograms, httpCallKey, latencyInNanoseconds)
-			} else if rpcSystemAttr, systemExist := spanAttr.Get(conventions.AttributeRPCSystem); systemExist {
-				p.keyValue.reset()
-				protocol := rpcSystemAttr.Str()
-				// apache_dubbo => dubbo
-				if index := strings.LastIndex(protocol, "_"); index != -1 {
-					protocol = protocol[index+1:]
-				}
-				rpcAddress := getClientPeer(spanAttr, protocol, "unknown")
-				rpcError := span.Status().Code() == ptrace.StatusCodeError
-				rpcCallKey := metricKey(p.buildExternalKey(pid, containerId, serviceName, span.Name(), rpcAddress, rpcError))
-				if _, has := p.externalCallMetricKeyToDimensions.Get(rpcCallKey); !has {
-					p.externalCallMetricKeyToDimensions.Add(rpcCallKey, p.keyValue.GetMap())
-				}
-				p.updateHistogram(p.externalCallHistograms, rpcCallKey, latencyInNanoseconds)
+			var externalKey string
+			if httpKey := p.httpParser.Parse(p.logger, pid, containerId, serviceName, span, spanAttr, p.keyValue); httpKey != "" {
+				externalKey = httpKey
+			} else if rpcKey := p.rpcParser.Parse(p.logger, pid, containerId, serviceName, span, spanAttr, p.keyValue); rpcKey != "" {
+				externalKey = rpcKey
 			} else {
 				_, dbSystemExist := spanAttr.Get(conventions.AttributeDBSystem)
 				_, mqSystemExist := spanAttr.Get(conventions.AttributeMessagingSystem)
 				if !dbSystemExist && !mqSystemExist {
-					p.keyValue.reset()
-					unknownAddress := getClientPeer(spanAttr, "unknown", "unknown")
-					unknownError := span.Status().Code() == ptrace.StatusCodeError
-					unknonwCallKey := metricKey(p.buildExternalKey(pid, containerId, serviceName, span.Name(), unknownAddress, unknownError))
-					if _, has := p.externalCallMetricKeyToDimensions.Get(unknonwCallKey); !has {
-						p.externalCallMetricKeyToDimensions.Add(unknonwCallKey, p.keyValue.GetMap())
-					}
-					p.updateHistogram(p.externalCallHistograms, unknonwCallKey, latencyInNanoseconds)
+					// 过滤DB 和 Mq
+					externalKey = parser.BuildExternalKey(p.keyValue, pid, containerId, serviceName,
+						span.Name(),
+						parser.GetClientPeer(spanAttr, parser.Unknown, parser.Unknown),
+						span.Status().Code() == ptrace.StatusCodeError,
+					)
 				}
+			}
+			if externalKey != "" {
+				externalCallKey := metricKey(externalKey)
+				if _, has := p.externalCallMetricKeyToDimensions.Get(externalCallKey); !has {
+					p.externalCallMetricKeyToDimensions.Add(externalCallKey, p.keyValue.GetMap())
+				}
+				p.updateHistogram(p.externalCallHistograms, externalCallKey, latencyInNanoseconds)
 			}
 		}
 	}
 
-	if p.config.MqEnabled && (span.Kind() == ptrace.SpanKindClient || span.Kind() == ptrace.SpanKindProducer || span.Kind() == ptrace.SpanKindConsumer) {
-		if mqSystemAttr, systemExist := spanAttr.Get(conventions.AttributeMessagingSystem); systemExist {
-			p.keyValue.reset()
-			mqAddress := getClientPeer(spanAttr, mqSystemAttr.Str(), mqSystemAttr.Str())
-			mqError := span.Status().Code() == ptrace.StatusCodeError
-			mqRole := strings.ToLower(span.Kind().String())
-			mqCallKey := metricKey(p.buildMqKey(pid, containerId, serviceName, span.Name(), mqAddress, mqError, mqRole))
+	if p.config.MqEnabled {
+		if mqKey := p.mqParser.Parse(p.logger, pid, containerId, serviceName, span, spanAttr, p.keyValue); mqKey != "" {
+			mqCallKey := metricKey(mqKey)
 			if _, has := p.mqCallMetricKeyToDimensions.Get(mqCallKey); !has {
 				p.mqCallMetricKeyToDimensions.Add(mqCallKey, p.keyValue.GetMap())
 			}
@@ -568,7 +478,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 }
 
 // buildKey Server Red指标
-func (p *connectorImp) buildKey(pid string, containerId string, serviceName string, span ptrace.Span) string {
+func (p *connectorImp) buildServerKey(pid string, containerId string, serviceName string, span ptrace.Span) string {
 	spanName := span.Name()
 	if len(p.serviceToOperations) > p.maxNumberOfServicesToTrack {
 		p.logger.Warn("Too many services to track, using overflow service name", zap.Int("maxNumberOfServicesToTrack", p.maxNumberOfServicesToTrack))
@@ -579,138 +489,16 @@ func (p *connectorImp) buildKey(pid string, containerId string, serviceName stri
 		spanName = overflowOperation
 	}
 
-	p.keyValue.
-		Add(keyServiceName, serviceName).
-		Add(keyContentKey, spanName).
-		Add(keyNodeName, p.nodeName).
-		Add(keyNodeIp, p.nodeIp).
-		Add(keyPid, pid).
-		Add(keyContainerId, containerId).
-		Add(keyTopSpan, strconv.FormatBool(span.ParentSpanID().IsEmpty())).
-		Add(keyIsError, strconv.FormatBool(span.Status().Code() == ptrace.StatusCodeError))
-
 	if _, ok := p.serviceToOperations[serviceName]; !ok {
 		p.serviceToOperations[serviceName] = make(map[string]struct{})
 	}
 	p.serviceToOperations[serviceName][spanName] = struct{}{}
 
-	return p.keyValue.GetValue()
-}
-
-// buildExternalKey Http/Rpc Red指标
-func (p *connectorImp) buildExternalKey(pid string, containerId string, serviceName string, name string, peer string, isError bool) string {
-	p.keyValue.
-		Add(keyServiceName, serviceName).
-		Add(keyNodeName, p.nodeName).
-		Add(keyNodeIp, p.nodeIp).
-		Add(keyPid, pid).
-		Add(keyContainerId, containerId).
-		Add(keyName, name).
-		Add(keyAddress, peer).
-		Add(keyIsError, strconv.FormatBool(isError))
-	return p.keyValue.GetValue()
-}
-
-// buildMqKey ActiveMq / RabbitMq / RocketMq / Kafka Red指标
-func (p *connectorImp) buildMqKey(pid string, containerId string, serviceName string, name string, address string, isError bool, role string) string {
-	p.keyValue.
-		Add(keyServiceName, serviceName).
-		Add(keyNodeName, p.nodeName).
-		Add(keyNodeIp, p.nodeIp).
-		Add(keyPid, pid).
-		Add(keyContainerId, containerId).
-		Add(keyName, name).
-		Add(keyAddress, address).
-		Add(keyRole, role).
-		Add(keyIsError, strconv.FormatBool(isError))
-	return p.keyValue.GetValue()
-}
-
-// buildDbKey DB Red指标
-func (p *connectorImp) buildDbKey(pid string, containerId string, serviceName string, dbSystem string, dbName string, name string, dbUrl string, isError bool) string {
-	p.keyValue.
-		Add(keyServiceName, serviceName).
-		Add(keyNodeName, p.nodeName).
-		Add(keyNodeIp, p.nodeIp).
-		Add(keyPid, pid).
-		Add(keyContainerId, containerId).
-		Add(keyName, name).
-		Add(keyDbSystem, dbSystem).
-		Add(keyDbName, dbName).
-		Add(keyDbUrl, dbUrl).
-		Add(keyIsError, strconv.FormatBool(isError))
-	return p.keyValue.GetValue()
-}
-
-func getAttrValueWithDefault(attr pcommon.Map, key string, defaultValue string) string {
-	// The more specific span attribute should take precedence.
-	attrValue, exists := attr.Get(key)
-	if exists {
-		return attrValue.AsString()
-	}
-	return defaultValue
-}
-
-func getHttpMethod(attr pcommon.Map) string {
-	// 1.x http.method
-	if httpMethod, found := attr.Get(AttributeHttpMethod); found {
-		return httpMethod.Str()
-	}
-	// 2.x http.request.method
-	if httpRequestMethod, found := attr.Get(AttributeHttpRequestMethod); found {
-		return httpRequestMethod.Str()
-	}
-	return ""
-}
-
-func getHttpUrl(attr pcommon.Map) string {
-	// 1.x http.url
-	if httpUrl, found := attr.Get(AttributeHttpUrl); found {
-		return httpUrl.Str()
-	}
-	// 2.x url.full
-	if urlFull, found := attr.Get(AttributeUrlFull); found {
-		return urlFull.Str()
-	}
-	return ""
-}
-
-func getClientPeer(attr pcommon.Map, protocol string, defaultValue string) string {
-	// 1.x - redis、grpc、rabbitmq
-	if netSockPeerAddr, addrFound := attr.Get(AttributeNetSockPeerAddr); addrFound {
-		if netSockPeerPort, portFound := attr.Get(AttributeNetSockPeerPort); portFound {
-			return fmt.Sprintf("%s://%s:%s", protocol, netSockPeerAddr.Str(), netSockPeerPort.AsString())
-		} else {
-			return fmt.Sprintf("%s://%s", protocol, netSockPeerAddr.Str())
-		}
-	}
-	// 2.x - redis、grpc、rabbitmq
-	if networkPeerAddress, addrFound := attr.Get(AttributeNetworkPeerAddress); addrFound {
-		if networkPeerPort, portFound := attr.Get(AttributeNetworkPeerPort); portFound {
-			return fmt.Sprintf("%s://%s:%s", protocol, networkPeerAddress.Str(), networkPeerPort.AsString())
-		} else {
-			return fmt.Sprintf("%s://%s", protocol, networkPeerAddress.Str())
-		}
-	}
-
-	// 1.x - httpclient、db、dubbo
-	if peerName, peerFound := attr.Get(AttributeNetPeerName); peerFound {
-		if peerPort, peerPortFound := attr.Get(AttributeNetPeerPort); peerPortFound {
-			return fmt.Sprintf("%s://%s:%s", protocol, peerName.Str(), peerPort.AsString())
-		} else {
-			return fmt.Sprintf("%s://%s", protocol, peerName.Str())
-		}
-	}
-	// 2.x - httpclient、db、dubbo
-	if serverAddress, serverFound := attr.Get(AttributeServerAddress); serverFound {
-		if serverPort, serverPortFound := attr.Get(AttributeServerPort); serverPortFound {
-			return fmt.Sprintf("%s://%s:%s", protocol, serverAddress.Str(), serverPort.AsString())
-		} else {
-			return fmt.Sprintf("%s://%s", protocol, serverAddress.Str())
-		}
-	}
-
-	return defaultValue
+	return parser.BuildServerKey(p.keyValue, pid, containerId, serviceName,
+		span.Name(),
+		span.ParentSpanID().IsEmpty(),
+		span.Status().Code() == ptrace.StatusCodeError,
+	)
 }
 
 // updateHistogram adds the histogram sample to the histogram defined by the metric key.
@@ -721,75 +509,4 @@ func (p *connectorImp) updateHistogram(histograms map[metricKey]cache.Histogram,
 		histograms[key] = histo
 	}
 	histo.Update(latency)
-}
-
-type ReusedKeyValue struct {
-	maxAttribute int
-	keys         []string
-	vals         []string
-	size         int
-	dest         *bytes.Buffer
-}
-
-func newKeyValue(maxAttribute int) *ReusedKeyValue {
-	return &ReusedKeyValue{
-		maxAttribute: maxAttribute,
-		keys:         make([]string, maxAttribute),
-		vals:         make([]string, maxAttribute),
-		dest:         bytes.NewBuffer(make([]byte, 0, 1024)),
-	}
-}
-
-func (kv *ReusedKeyValue) reset() {
-	kv.size = 0
-}
-
-func (kv *ReusedKeyValue) Add(key string, value string) *ReusedKeyValue {
-	if kv.size < kv.maxAttribute {
-		kv.keys[kv.size] = key
-		kv.vals[kv.size] = value
-
-		kv.size++
-	}
-
-	return kv
-}
-
-func (kv *ReusedKeyValue) GetValue() string {
-	kv.dest.Reset()
-	for i := 0; i < kv.size; i++ {
-		if i > 0 {
-			kv.dest.WriteString(metricKeySeparator)
-		}
-		kv.dest.WriteString(kv.vals[i])
-	}
-	return kv.dest.String()
-}
-
-func (kv *ReusedKeyValue) GetMap() pcommon.Map {
-	dims := pcommon.NewMap()
-	for i := 0; i < kv.size; i++ {
-		dims.PutStr(kv.keys[i], kv.vals[i])
-	}
-	return dims
-}
-
-func getNodeName() string {
-	// 从环境变量获取NodeName
-	if nodeNameFromEnv, exist := os.LookupEnv(envNodeName); exist {
-		return nodeNameFromEnv
-	}
-	// 使用主机名作为NodeName
-	if hostName, err := os.Hostname(); err == nil {
-		return hostName
-	}
-	return "Unknown"
-}
-
-func getNodeIp() string {
-	// 从环境变量获取NodeIP
-	if nodeIpFromEnv, exist := os.LookupEnv(envNodeIP); exist {
-		return nodeIpFromEnv
-	}
-	return "Unknown"
 }
