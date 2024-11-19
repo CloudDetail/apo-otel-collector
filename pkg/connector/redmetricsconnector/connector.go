@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector/internal/cache"
+	"github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector/internal/parser"
 	"github.com/CloudDetail/apo-otel-collector/pkg/fillproc"
 	"github.com/CloudDetail/apo-otel-collector/pkg/sqlprune"
 	"github.com/tilinna/clock"
@@ -51,6 +52,9 @@ const (
 
 	AttributeHttpMethod        = "http.method"         // 1.x
 	AttributeHttpRequestMethod = "http.request.method" // 2.x
+
+	AttributeHttpUrl = "http.url" // 1.x
+	AttributeUrlFull = "url.full" // 2.x
 
 	AttributeNetPeerName   = "net.peer.name"  // 1.x
 	AttributeNetPeerPort   = "net.peer.port"  // 1.x
@@ -105,6 +109,7 @@ type connectorImp struct {
 	maxNumberOfServicesToTrack             int
 	maxNumberOfOperationsToTrackPerService int
 	metricsType                            cache.MetricsType
+	httpParser                             *parser.HttpParser
 }
 
 var (
@@ -172,6 +177,7 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		maxNumberOfServicesToTrack:             pConfig.MaxServicesToTrack,
 		maxNumberOfOperationsToTrackPerService: pConfig.MaxOperationsToTrackPerService,
 		metricsType:                            cache.GetMetricsType(pConfig.MetricsType),
+		httpParser:                             parser.NewHttpParser(pConfig.HttpParser),
 	}, nil
 }
 
@@ -509,7 +515,8 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 				p.keyValue.reset()
 				httpAddress := getClientPeer(spanAttr, "http", "unknown")
 				httpError := span.Status().Code() == ptrace.StatusCodeError
-				httpCallKey := metricKey(p.buildExternalKey(pid, containerId, serviceName, httpMethod, httpAddress, httpError))
+				httpName := p.httpParser.Parse(httpMethod, getHttpUrl(spanAttr))
+				httpCallKey := metricKey(p.buildExternalKey(pid, containerId, serviceName, httpName, httpAddress, httpError))
 				if _, has := p.externalCallMetricKeyToDimensions.Get(httpCallKey); !has {
 					p.externalCallMetricKeyToDimensions.Add(httpCallKey, p.keyValue.GetMap())
 				}
@@ -652,6 +659,18 @@ func getHttpMethod(attr pcommon.Map) string {
 	// 2.x http.request.method
 	if httpRequestMethod, found := attr.Get(AttributeHttpRequestMethod); found {
 		return httpRequestMethod.Str()
+	}
+	return ""
+}
+
+func getHttpUrl(attr pcommon.Map) string {
+	// 1.x http.url
+	if httpUrl, found := attr.Get(AttributeHttpUrl); found {
+		return httpUrl.Str()
+	}
+	// 2.x url.full
+	if urlFull, found := attr.Get(AttributeUrlFull); found {
+		return urlFull.Str()
 	}
 	return ""
 }

@@ -96,6 +96,8 @@ connectors:
     metrics_type: "vm"
     # Promethues场景下需指定分桶.
     latency_histogram_buckets: [5ms, 10ms, 20ms, 30ms, 50ms, 80ms, 100ms, 150ms, 200ms, 300ms, 400ms, 500ms, 800ms, 1200ms, 3s, 5s, 10s, 15s, 20s, 30s, 40s, 50s, 60s]
+    # URL收敛算法：httpMethod / topUrl
+    http_parser: topUrl
 ```
 
 ## FillProcExtension
