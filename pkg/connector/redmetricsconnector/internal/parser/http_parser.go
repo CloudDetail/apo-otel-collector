@@ -29,7 +29,7 @@ func NewHttpParser(urlParser string) *HttpParser {
 }
 
 func (parser *HttpParser) Parse(logger *zap.Logger, pid string, containerId string, serviceName string, span ptrace.Span, spanAttr pcommon.Map, keyValue *cache.ReusedKeyValue) string {
-	if span.Kind() == ptrace.SpanKindClient {
+	if span.Kind() != ptrace.SpanKindClient {
 		return ""
 	}
 	httpMethod := getHttpMethod(spanAttr)

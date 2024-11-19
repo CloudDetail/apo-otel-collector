@@ -18,7 +18,7 @@ func NewRpcParser() *RpcParser {
 }
 
 func (parser *RpcParser) Parse(logger *zap.Logger, pid string, containerId string, serviceName string, span ptrace.Span, spanAttr pcommon.Map, keyValue *cache.ReusedKeyValue) string {
-	if span.Kind() == ptrace.SpanKindClient {
+	if span.Kind() != ptrace.SpanKindClient {
 		return ""
 	}
 	rpcSystemAttr, systemExist := spanAttr.Get(conventions.AttributeRPCSystem)
