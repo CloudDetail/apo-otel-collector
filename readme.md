@@ -80,6 +80,10 @@ connectors:
     server_enabled: true
     # 开启DB RED指标生成
     db_enabled: true
+    # 开启HTTP/RPC对外调用 RED指标生成
+    external_enabled: true
+    # 开启MQ RED指标生成
+    mq_enabled: true
     # RED Key缓存的数量，超过则清理；用于清理已失效PID数据.
     dimensions_cache_size: 1000
     # 指标发送间隔
@@ -88,6 +92,10 @@ connectors:
     max_services_to_track: 256
     # 每个服务下最大URL数，超过则将URL打标为 overflow_operation.
     max_operations_to_track_per_service: 2048
+    # vm(VictoriaMetrics) or prom(Promethues)
+    metrics_type: "vm"
+    # Promethues场景下需指定分桶.
+    latency_histogram_buckets: [5ms, 10ms, 20ms, 30ms, 50ms, 80ms, 100ms, 150ms, 200ms, 300ms, 400ms, 500ms, 800ms, 1200ms, 3s, 5s, 10s, 15s, 20s, 30s, 40s, 50s, 60s]
 ```
 
 ## FillProcExtension

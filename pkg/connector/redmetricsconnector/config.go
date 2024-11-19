@@ -19,4 +19,8 @@ type Config struct {
 	MaxServicesToTrack int `mapstructure:"max_services_to_track"`
 	// 每个服务下最大URL数，超过则将URL打标为 overflow_operation.
 	MaxOperationsToTrackPerService int `mapstructure:"max_operations_to_track_per_service"`
+	// 指标类型，vm 或 pm.
+	MetricsType string `mapstructure:"metrics_type"`
+	// Promethues场景下需指定分桶.
+	LatencyHistogramBuckets []time.Duration `mapstructure:"latency_histogram_buckets"`
 }

@@ -76,11 +76,15 @@ type connectorImp struct {
 	nodeName string
 	nodeIp   string
 
+	// The starting time of the data points.
+	startTimestamp pcommon.Timestamp
+
 	// Histogram.
-	serverHistograms       map[metricKey]*cache.Histogram // 服务 指标
-	dbCallHistograms       map[metricKey]*cache.Histogram // db 指标
-	externalCallHistograms map[metricKey]*cache.Histogram // external 指标
-	mqCallHistograms       map[metricKey]*cache.Histogram // mq 指标
+	serverHistograms       map[metricKey]cache.Histogram // 服务 指标
+	dbCallHistograms       map[metricKey]cache.Histogram // db 指标
+	externalCallHistograms map[metricKey]cache.Histogram // external 指标
+	mqCallHistograms       map[metricKey]cache.Histogram // mq 指标
+	bounds                 []float64
 
 	keyValue *ReusedKeyValue
 
@@ -100,7 +104,15 @@ type connectorImp struct {
 	serviceToOperations                    map[string]map[string]struct{}
 	maxNumberOfServicesToTrack             int
 	maxNumberOfOperationsToTrackPerService int
+	metricsType                            cache.MetricsType
 }
+
+var (
+	defaultLatencyHistogramBucketsMs = []float64{
+		2_000_000, 4_000_000, 6_000_000, 8_000_000, 10_000_000, 50_000_000, 100_000_000, 200_000_000, 400_000_000, 800_000_000,
+		1_000_000_000, 1_400_000_000, 2_000_000_000, 5_000_000_000, 10_000_000_000, 15_000_000_000, 30_000_000_000,
+	}
+)
 
 func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Ticker) (*connectorImp, error) {
 	logger.Info("Building redmetricsconnector with config", zap.Any("config", config))
@@ -132,15 +144,23 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 	if err != nil {
 		return nil, err
 	}
+
+	bounds := defaultLatencyHistogramBucketsMs
+	if pConfig.LatencyHistogramBuckets != nil {
+		bounds = mapDurationsToNanos(pConfig.LatencyHistogramBuckets)
+	}
+
 	return &connectorImp{
 		logger:                                 logger,
 		config:                                 *pConfig,
 		nodeName:                               getNodeName(),
 		nodeIp:                                 getNodeIp(),
-		serverHistograms:                       make(map[metricKey]*cache.Histogram),
-		dbCallHistograms:                       make(map[metricKey]*cache.Histogram),
-		externalCallHistograms:                 make(map[metricKey]*cache.Histogram),
-		mqCallHistograms:                       make(map[metricKey]*cache.Histogram),
+		startTimestamp:                         pcommon.NewTimestampFromTime(time.Now()),
+		serverHistograms:                       make(map[metricKey]cache.Histogram),
+		dbCallHistograms:                       make(map[metricKey]cache.Histogram),
+		externalCallHistograms:                 make(map[metricKey]cache.Histogram),
+		mqCallHistograms:                       make(map[metricKey]cache.Histogram),
+		bounds:                                 bounds,
 		keyValue:                               newKeyValue(100), // 最大100的KeyValue 可重用Map
 		metricKeyToDimensions:                  metricKeyToDimensionsCache,
 		dbCallMetricKeyToDimensions:            dbMetricKeyToDimensionsCache,
@@ -151,7 +171,16 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		serviceToOperations:                    make(map[string]map[string]struct{}),
 		maxNumberOfServicesToTrack:             pConfig.MaxServicesToTrack,
 		maxNumberOfOperationsToTrackPerService: pConfig.MaxOperationsToTrackPerService,
+		metricsType:                            cache.GetMetricsType(pConfig.MetricsType),
 	}, nil
+}
+
+func mapDurationsToNanos(vs []time.Duration) []float64 {
+	vsm := make([]float64, len(vs))
+	for i, v := range vs {
+		vsm[i] = float64(v.Nanoseconds())
+	}
+	return vsm
 }
 
 // Start implements the component.Component interface.
@@ -229,16 +258,16 @@ func (p *connectorImp) buildMetrics() (pmetric.Metrics, error) {
 	ilm := m.ResourceMetrics().AppendEmpty().ScopeMetrics().AppendEmpty()
 	ilm.Scope().SetName("redmetricsconnector")
 
-	if err := collectLatencyMetrics(ilm, p.metricKeyToDimensions, p.serverHistograms, "kindling_span_trace_duration_nanoseconds"); err != nil {
+	if err := p.collectLatencyMetrics(ilm, p.metricKeyToDimensions, p.serverHistograms, "kindling_span_trace_duration_nanoseconds"); err != nil {
 		return pmetric.Metrics{}, err
 	}
-	if err := collectLatencyMetrics(ilm, p.dbCallMetricKeyToDimensions, p.dbCallHistograms, "kindling_db_duration_nanoseconds"); err != nil {
+	if err := p.collectLatencyMetrics(ilm, p.dbCallMetricKeyToDimensions, p.dbCallHistograms, "kindling_db_duration_nanoseconds"); err != nil {
 		return pmetric.Metrics{}, err
 	}
-	if err := collectLatencyMetrics(ilm, p.externalCallMetricKeyToDimensions, p.externalCallHistograms, "kindling_external_duration_nanoseconds"); err != nil {
+	if err := p.collectLatencyMetrics(ilm, p.externalCallMetricKeyToDimensions, p.externalCallHistograms, "kindling_external_duration_nanoseconds"); err != nil {
 		return pmetric.Metrics{}, err
 	}
-	if err := collectLatencyMetrics(ilm, p.mqCallMetricKeyToDimensions, p.mqCallHistograms, "kindling_mq_duration_nanoseconds"); err != nil {
+	if err := p.collectLatencyMetrics(ilm, p.mqCallMetricKeyToDimensions, p.mqCallHistograms, "kindling_mq_duration_nanoseconds"); err != nil {
 		return pmetric.Metrics{}, err
 	}
 
@@ -272,13 +301,56 @@ func (p *connectorImp) buildMetrics() (pmetric.Metrics, error) {
 
 // collectLatencyMetrics collects the raw latency metrics, writing the data
 // into the given instrumentation library metrics.
-func collectLatencyMetrics(ilm pmetric.ScopeMetrics,
+func (p *connectorImp) collectLatencyMetrics(ilm pmetric.ScopeMetrics,
 	metricKeyToDimensions *cache.Cache[metricKey, pcommon.Map],
-	histograms map[metricKey]*cache.Histogram,
+	histograms map[metricKey]cache.Histogram,
 	prefix string) error {
 	if len(histograms) == 0 {
 		return nil
 	}
+
+	if p.metricsType == cache.MetricsProm {
+		return p.collectPromLatencyMetrics(ilm, metricKeyToDimensions, histograms, prefix)
+	} else {
+		return collectVmLatencyMetrics(ilm, metricKeyToDimensions, histograms, prefix)
+	}
+}
+
+func (p *connectorImp) collectPromLatencyMetrics(ilm pmetric.ScopeMetrics,
+	metricKeyToDimensions *cache.Cache[metricKey, pcommon.Map],
+	histograms map[metricKey]cache.Histogram,
+	prefix string) error {
+
+	mLatency := ilm.Metrics().AppendEmpty()
+	mLatency.SetName(prefix)
+	mLatency.SetUnit("ns")
+	mLatency.SetEmptyHistogram().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
+	dps := mLatency.Histogram().DataPoints()
+	dps.EnsureCapacity(len(histograms))
+	timestamp := pcommon.NewTimestampFromTime(time.Now())
+	for key, hist := range histograms {
+		dimensions, ok := metricKeyToDimensions.Get(key)
+		if !ok {
+			return fmt.Errorf("value not found in metricKeyToDimensions cache by key %q", key)
+		}
+		values := hist.Read()
+
+		dpLatency := dps.AppendEmpty()
+		dpLatency.SetStartTimestamp(p.startTimestamp)
+		dpLatency.SetTimestamp(timestamp)
+		dpLatency.ExplicitBounds().FromRaw(p.bounds)
+		dpLatency.BucketCounts().FromRaw(values.GetBucketCounts())
+		dpLatency.SetCount(values.GetCount())
+		dpLatency.SetSum(values.GetSum())
+		dimensions.CopyTo(dpLatency.Attributes())
+	}
+	return nil
+}
+
+func collectVmLatencyMetrics(ilm pmetric.ScopeMetrics,
+	metricKeyToDimensions *cache.Cache[metricKey, pcommon.Map],
+	histograms map[metricKey]cache.Histogram,
+	prefix string) error {
 
 	timestamp := pcommon.NewTimestampFromTime(time.Now())
 	mLatency := ilm.Metrics().AppendEmpty()
@@ -301,27 +373,26 @@ func collectLatencyMetrics(ilm pmetric.ScopeMetrics,
 			return fmt.Errorf("value not found in metricKeyToDimensions cache by key %q", key)
 		}
 
-		countTotal := uint64(0)
-		hist.VisitNonZeroBuckets(func(vmrange string, count uint64) {
+		values := hist.Read()
+		for bucket, count := range values.GetBuckets() {
 			dpLatency := dps.AppendEmpty()
 			dpLatency.SetTimestamp(timestamp)
 			dpLatency.SetIntValue(int64(count))
 
 			dpLatency.Attributes().EnsureCapacity(dimensions.Len() + 1)
 			dimensions.CopyTo(dpLatency.Attributes())
-			dpLatency.Attributes().PutStr("vmrange", vmrange)
-			countTotal += count
-		})
+			dpLatency.Attributes().PutStr("vmrange", bucket)
+		}
 
-		if countTotal > 0 {
+		if values.GetCount() > 0 {
 			dpLatencyCount := countDps.AppendEmpty()
 			dpLatencyCount.SetTimestamp(timestamp)
-			dpLatencyCount.SetIntValue(int64(countTotal))
+			dpLatencyCount.SetIntValue(int64(values.GetCount()))
 			dimensions.CopyTo(dpLatencyCount.Attributes())
 
 			dpLatencySum := sumDps.AppendEmpty()
 			dpLatencySum.SetTimestamp(timestamp)
-			dpLatencySum.SetIntValue(int64(hist.GetSum()))
+			dpLatencySum.SetIntValue(int64(values.GetSum()))
 			dimensions.CopyTo(dpLatencySum.Attributes())
 		}
 	}
@@ -384,7 +455,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 			if _, has := p.metricKeyToDimensions.Get(key); !has {
 				p.metricKeyToDimensions.Add(key, p.keyValue.GetMap())
 			}
-			updateHistogram(p.serverHistograms, key, latencyInNanoseconds)
+			p.updateHistogram(p.serverHistograms, key, latencyInNanoseconds)
 		}
 	}
 
@@ -429,7 +500,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 				if _, has := p.dbCallMetricKeyToDimensions.Get(dbCallKey); !has {
 					p.dbCallMetricKeyToDimensions.Add(dbCallKey, p.keyValue.GetMap())
 				}
-				updateHistogram(p.dbCallHistograms, dbCallKey, latencyInNanoseconds)
+				p.updateHistogram(p.dbCallHistograms, dbCallKey, latencyInNanoseconds)
 			}
 		}
 
@@ -442,7 +513,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 				if _, has := p.externalCallMetricKeyToDimensions.Get(httpCallKey); !has {
 					p.externalCallMetricKeyToDimensions.Add(httpCallKey, p.keyValue.GetMap())
 				}
-				updateHistogram(p.externalCallHistograms, httpCallKey, latencyInNanoseconds)
+				p.updateHistogram(p.externalCallHistograms, httpCallKey, latencyInNanoseconds)
 			} else if rpcSystemAttr, systemExist := spanAttr.Get(conventions.AttributeRPCSystem); systemExist {
 				p.keyValue.reset()
 				protocol := rpcSystemAttr.Str()
@@ -456,7 +527,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 				if _, has := p.externalCallMetricKeyToDimensions.Get(rpcCallKey); !has {
 					p.externalCallMetricKeyToDimensions.Add(rpcCallKey, p.keyValue.GetMap())
 				}
-				updateHistogram(p.externalCallHistograms, rpcCallKey, latencyInNanoseconds)
+				p.updateHistogram(p.externalCallHistograms, rpcCallKey, latencyInNanoseconds)
 			} else {
 				_, dbSystemExist := spanAttr.Get(conventions.AttributeDBSystem)
 				_, mqSystemExist := spanAttr.Get(conventions.AttributeMessagingSystem)
@@ -468,7 +539,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 					if _, has := p.externalCallMetricKeyToDimensions.Get(unknonwCallKey); !has {
 						p.externalCallMetricKeyToDimensions.Add(unknonwCallKey, p.keyValue.GetMap())
 					}
-					updateHistogram(p.externalCallHistograms, unknonwCallKey, latencyInNanoseconds)
+					p.updateHistogram(p.externalCallHistograms, unknonwCallKey, latencyInNanoseconds)
 				}
 			}
 		}
@@ -484,7 +555,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 			if _, has := p.mqCallMetricKeyToDimensions.Get(mqCallKey); !has {
 				p.mqCallMetricKeyToDimensions.Add(mqCallKey, p.keyValue.GetMap())
 			}
-			updateHistogram(p.mqCallHistograms, mqCallKey, latencyInNanoseconds)
+			p.updateHistogram(p.mqCallHistograms, mqCallKey, latencyInNanoseconds)
 		}
 	}
 }
@@ -624,10 +695,10 @@ func getClientPeer(attr pcommon.Map, protocol string, defaultValue string) strin
 }
 
 // updateHistogram adds the histogram sample to the histogram defined by the metric key.
-func updateHistogram(histograms map[metricKey]*cache.Histogram, key metricKey, latency float64) {
+func (p *connectorImp) updateHistogram(histograms map[metricKey]cache.Histogram, key metricKey, latency float64) {
 	histo, ok := histograms[key]
 	if !ok {
-		histo = cache.NewHistogram()
+		histo = cache.NewHistogram(p.metricsType, p.bounds)
 		histograms[key] = histo
 	}
 	histo.Update(latency)

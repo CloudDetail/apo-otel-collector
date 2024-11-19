@@ -44,7 +44,7 @@ var bucketMultiplier = math.Pow(10, 1.0/bucketsPerDecimal)
 // for all the previous buckets.
 //
 // Zero histogram is usable.
-type Histogram struct {
+type VmHistogram struct {
 	// Mu gurantees synchronous update for all the counters and sum.
 	//
 	// Do not use sync.RWMutex, since it has zero sense from performance PoV.
@@ -65,7 +65,7 @@ type Histogram struct {
 }
 
 // Reset resets the given histogram.
-func (h *Histogram) Reset() {
+func (h *VmHistogram) Reset() {
 	h.mu.Lock()
 	for _, db := range h.decimalBuckets[:] {
 		if db == nil {
@@ -84,7 +84,7 @@ func (h *Histogram) Reset() {
 // Update updates h with v.
 //
 // Negative values and NaNs are ignored.
-func (h *Histogram) Update(v float64) {
+func (h *VmHistogram) Update(v float64) {
 	if math.IsNaN(v) || v < 0 {
 		// Skip NaNs and negative values.
 		return
@@ -117,7 +117,7 @@ func (h *Histogram) Update(v float64) {
 }
 
 // Merge merges src to h
-func (h *Histogram) Merge(src *Histogram) {
+func (h *VmHistogram) Merge(src *VmHistogram) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -150,7 +150,7 @@ func (h *Histogram) Merge(src *Histogram) {
 // isn't included in the bucket, while the upper bound is included.
 // This is required to be compatible with Prometheus-style histogram buckets
 // with `le` (less or equal) labels.
-func (h *Histogram) VisitNonZeroBuckets(f func(vmrange string, count uint64)) {
+func (h *VmHistogram) VisitNonZeroBuckets(f func(vmrange string, count uint64)) {
 	h.mu.Lock()
 	if h.lower > 0 {
 		f(lowerBucketRange, h.lower)
@@ -183,12 +183,12 @@ func (h *Histogram) VisitNonZeroBuckets(f func(vmrange string, count uint64)) {
 //   - foo{bar="baz",aaa="b"}
 //
 // The returned histogram is safe to use from concurrent goroutines.
-func NewHistogram() *Histogram {
-	return &Histogram{}
+func NewVmHistogram() *VmHistogram {
+	return &VmHistogram{}
 }
 
 // UpdateDuration updates request duration based on the given startTime.
-func (h *Histogram) UpdateDuration(startTime time.Time) {
+func (h *VmHistogram) UpdateDuration(startTime time.Time) {
 	d := time.Since(startTime).Seconds()
 	h.Update(d)
 }
@@ -217,9 +217,56 @@ var (
 	bucketRangesOnce sync.Once
 )
 
-func (h *Histogram) GetSum() float64 {
+func (h *VmHistogram) GetSum() float64 {
 	h.mu.Lock()
 	sum := h.sum
 	h.mu.Unlock()
 	return sum
+}
+
+func (h *VmHistogram) Read() HistogramValues {
+	values := newVmHistogramValues()
+	h.VisitNonZeroBuckets(func(vmrange string, count uint64) {
+		// <metric_name>_bucket{<optional_tags>,vmrange="<start>...<end>"} <counter>
+		values.buckets[vmrange] = count
+		values.count += count
+	})
+	if values.count > 0 {
+		values.sum = h.GetSum()
+	}
+	return values
+}
+
+type vmHistogramValues struct {
+	buckets map[string]uint64
+	count   uint64
+	sum     float64
+}
+
+func newVmHistogramValues() *vmHistogramValues {
+	return &vmHistogramValues{
+		buckets: make(map[string]uint64, 0),
+		count:   0,
+		sum:     0,
+	}
+}
+
+func (values *vmHistogramValues) GetBuckets() map[string]uint64 {
+	return values.buckets
+}
+
+func (values *vmHistogramValues) GetBucketCounts() []uint64 {
+	panic("unsupported GetBucketCounts")
+}
+
+func (values *vmHistogramValues) GetKey() string {
+	return "vmrange"
+}
+
+func (values *vmHistogramValues) GetCount() uint64 {
+	return values.count
+}
+
+func (values *vmHistogramValues) GetSum() float64 {
+	return values.sum
 }
