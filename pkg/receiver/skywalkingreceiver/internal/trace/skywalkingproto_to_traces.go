@@ -264,7 +264,7 @@ func swToTags(span *agentV3.SpanObject, dest pcommon.Map) {
 	if span.SpanType == agentV3.SpanType_Exit {
 		dest.PutStr(conventions.AttributeNetPeerName, span.Peer)
 		if span.SpanLayer == agentV3.SpanLayer_RPCFramework {
-			dest.PutStr(conventions.AttributeRPCService, strings.ToLower(GetComponent(span.ComponentId)))
+			dest.PutStr(conventions.AttributeRPCSystem, strings.ToLower(GetComponent(span.ComponentId)))
 		}
 	}
 	if span.Tags == nil {
