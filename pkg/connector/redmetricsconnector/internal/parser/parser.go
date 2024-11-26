@@ -41,6 +41,7 @@ const (
 	keyDbName   = "db_name"
 	keyDbUrl    = "db_url"
 	keyAddress  = "address"
+	keySystem   = "system"
 	keyRole     = "role"
 )
 
@@ -68,7 +69,7 @@ func BuildServerKey(keyValue *cache.ReusedKeyValue, pid string, containerId stri
 }
 
 // buildExternalKey Http/Rpc Red指标
-func BuildExternalKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, name string, peer string, isError bool) string {
+func BuildExternalKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, name string, peer string, system string, isError bool) string {
 	keyValue.Reset()
 	keyValue.
 		Add(keyServiceName, serviceName).
@@ -78,6 +79,7 @@ func BuildExternalKey(keyValue *cache.ReusedKeyValue, pid string, containerId st
 		Add(keyContainerId, containerId).
 		Add(keyName, name).
 		Add(keyAddress, peer).
+		Add(keySystem, system).
 		Add(keyIsError, strconv.FormatBool(isError))
 	return keyValue.GetValue()
 }
@@ -100,7 +102,7 @@ func buildDbKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, 
 }
 
 // buildMqKey ActiveMq / RabbitMq / RocketMq / Kafka Red指标
-func buildMqKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, name string, address string, isError bool, role string) string {
+func buildMqKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, name string, peer string, mqSystem string, isError bool, role string) string {
 	keyValue.Reset()
 	keyValue.
 		Add(keyServiceName, serviceName).
@@ -109,48 +111,49 @@ func buildMqKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, 
 		Add(keyPid, pid).
 		Add(keyContainerId, containerId).
 		Add(keyName, name).
-		Add(keyAddress, address).
+		Add(keyAddress, peer).
+		Add(keySystem, mqSystem).
 		Add(keyRole, role).
 		Add(keyIsError, strconv.FormatBool(isError))
 	return keyValue.GetValue()
 }
 
-func GetClientPeer(attr pcommon.Map, protocol string, defaultValue string) string {
+func GetClientPeer(attr pcommon.Map) string {
 	// 1.x - redis、grpc、rabbitmq
 	if netSockPeerAddr, addrFound := attr.Get(AttributeNetSockPeerAddr); addrFound {
 		if netSockPeerPort, portFound := attr.Get(AttributeNetSockPeerPort); portFound {
-			return fmt.Sprintf("%s://%s:%s", protocol, netSockPeerAddr.Str(), netSockPeerPort.AsString())
+			return fmt.Sprintf("%s:%s", netSockPeerAddr.Str(), netSockPeerPort.AsString())
 		} else {
-			return fmt.Sprintf("%s://%s", protocol, netSockPeerAddr.Str())
+			return netSockPeerAddr.Str()
 		}
 	}
 	// 2.x - redis、grpc、rabbitmq
 	if networkPeerAddress, addrFound := attr.Get(AttributeNetworkPeerAddress); addrFound {
 		if networkPeerPort, portFound := attr.Get(AttributeNetworkPeerPort); portFound {
-			return fmt.Sprintf("%s://%s:%s", protocol, networkPeerAddress.Str(), networkPeerPort.AsString())
+			return fmt.Sprintf("%s:%s", networkPeerAddress.Str(), networkPeerPort.AsString())
 		} else {
-			return fmt.Sprintf("%s://%s", protocol, networkPeerAddress.Str())
+			return networkPeerAddress.Str()
 		}
 	}
 
 	// 1.x - httpclient、db、dubbo
 	if peerName, peerFound := attr.Get(AttributeNetPeerName); peerFound {
 		if peerPort, peerPortFound := attr.Get(AttributeNetPeerPort); peerPortFound {
-			return fmt.Sprintf("%s://%s:%s", protocol, peerName.Str(), peerPort.AsString())
+			return fmt.Sprintf("%s:%s", peerName.Str(), peerPort.AsString())
 		} else {
-			return fmt.Sprintf("%s://%s", protocol, peerName.Str())
+			return peerName.Str()
 		}
 	}
 	// 2.x - httpclient、db、dubbo
 	if serverAddress, serverFound := attr.Get(AttributeServerAddress); serverFound {
 		if serverPort, serverPortFound := attr.Get(AttributeServerPort); serverPortFound {
-			return fmt.Sprintf("%s://%s:%s", protocol, serverAddress.Str(), serverPort.AsString())
+			return fmt.Sprintf("%s:%s", serverAddress.Str(), serverPort.AsString())
 		} else {
-			return fmt.Sprintf("%s://%s", protocol, serverAddress.Str())
+			return serverAddress.Str()
 		}
 	}
 
-	return defaultValue
+	return ""
 }
 
 func getNodeName() string {

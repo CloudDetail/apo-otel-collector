@@ -48,8 +48,9 @@ func (parser *MqParser) Parse(logger *zap.Logger, pid string, containerId string
 	}
 
 	return buildMqKey(keyValue, pid, containerId, serviceName,
-		name, // Topic
-		GetClientPeer(spanAttr, mqSystem, mqSystem),    // mysql://ip:port
+		name,                    // Topic
+		GetClientPeer(spanAttr), // ip:port
+		mqSystem,                // mqSystem, eg. rabbitmq、kafka
 		span.Status().Code() == ptrace.StatusCodeError, // IsError
 		strings.ToLower(span.Kind().String()),
 	)

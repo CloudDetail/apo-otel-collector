@@ -451,7 +451,8 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 					// 过滤DB 和 Mq
 					externalKey = parser.BuildExternalKey(p.keyValue, pid, containerId, serviceName,
 						span.Name(),
-						parser.GetClientPeer(spanAttr, parser.Unknown, parser.Unknown),
+						parser.GetClientPeer(spanAttr),
+						"unknown",
 						span.Status().Code() == ptrace.StatusCodeError,
 					)
 				}

@@ -66,8 +66,8 @@ func (parser *DbParser) Parse(logger *zap.Logger, pid string, containerId string
 	}
 	return buildDbKey(keyValue, pid, containerId, serviceName,
 		dbSystem, dbName,
-		name, // SELECT db.table
-		GetClientPeer(spanAttr, dbSystem, Unknown),     // mysql://ip:port
+		name,                    // SELECT db.table
+		GetClientPeer(spanAttr), // ip:port
 		span.Status().Code() == ptrace.StatusCodeError, // IsError
 	)
 }

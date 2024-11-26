@@ -39,7 +39,8 @@ func (parser *HttpParser) Parse(logger *zap.Logger, pid string, containerId stri
 
 	return BuildExternalKey(keyValue, pid, containerId, serviceName,
 		parser.parse(httpMethod, getHttpUrl(spanAttr)), // Get /xxx
-		GetClientPeer(spanAttr, "http", Unknown),       // http://ip:port
+		GetClientPeer(spanAttr),                        // ip:port
+		"http",
 		span.Status().Code() == ptrace.StatusCodeError, // IsError
 	)
 }
