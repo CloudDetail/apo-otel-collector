@@ -229,8 +229,8 @@ func (p *connectorImp) ConsumeTraces(_ context.Context, traces ptrace.Traces) er
 		// 遍历未匹配的ExitSpan列表
 		for index := 0; index < len(p.unMatchedSpans); index++ {
 			unMatchedSpan := p.unMatchedSpans[index]
-			if traceMapping, found := cachedTraces[unMatchedSpan.Span.TraceID()]; found {
-				entryUrl := traceMapping.GetMatchedEntrySpanName(unMatchedSpan.Span)
+			if spanMapping, found := cachedTraces[unMatchedSpan.Span.TraceID()]; found {
+				entryUrl := spanMapping.GetEntrySpanName(unMatchedSpan.Span.SpanID())
 				if entryUrl != "" {
 					// p.logger.Info("Found UnMatcheSpan",
 					// 	zap.String("traceId", unMatchedSpan.Span.TraceID().String()),
@@ -295,7 +295,7 @@ func (p *connectorImp) ConsumeTraces(_ context.Context, traces ptrace.Traces) er
 	return nil
 }
 
-func (p *connectorImp) processUrlSpan(traceMapping *tracecache.TraceMapping, expireTime int64, pid string, containerId string, serviceName string, span *ptrace.Span) {
+func (p *connectorImp) processUrlSpan(spanMapping tracecache.SpanMapping, expireTime int64, pid string, containerId string, serviceName string, span *ptrace.Span) {
 	if span.Kind() == ptrace.SpanKindUnspecified || span.Kind() == ptrace.SpanKindInternal {
 		return
 	}
@@ -304,23 +304,23 @@ func (p *connectorImp) processUrlSpan(traceMapping *tracecache.TraceMapping, exp
 	defer p.lock.Unlock()
 
 	entryUrl := ""
-	if span.Kind() == ptrace.SpanKindClient || span.Kind() == ptrace.SpanKindProducer {
-		if traceMapping != nil {
-			entryUrl = traceMapping.GetMatchedEntrySpanName(span)
+	if spanMapping != nil {
+		if span.Kind() == ptrace.SpanKindClient || span.Kind() == ptrace.SpanKindProducer {
+			entryUrl = spanMapping.GetEntrySpanName(span.SpanID())
+			if entryUrl == "" {
+				// 未匹配的ExitSpan
+				// p.logger.Info("Add UnMatcheSpan",
+				// 	zap.String("traceId", span.TraceID().String()),
+				// 	zap.String("spanId", span.SpanID().String()),
+				// 	zap.String("spanName", span.Name()),
+				// )
+				// 只有对外调用 且 未匹配到
+				p.unMatchedSpans = append(p.unMatchedSpans, newResourceSpan(expireTime, pid, containerId, serviceName, span))
+				return
+			}
+		} else if span.Kind() == ptrace.SpanKindConsumer {
+			entryUrl = span.Name()
 		}
-		if entryUrl == "" {
-			// 未匹配的ExitSpan
-			// p.logger.Info("Add UnMatcheSpan",
-			// 	zap.String("traceId", span.TraceID().String()),
-			// 	zap.String("spanId", span.SpanID().String()),
-			// 	zap.String("spanName", span.Name()),
-			// )
-			// 只有对外调用 且 未匹配到
-			p.unMatchedSpans = append(p.unMatchedSpans, newResourceSpan(expireTime, pid, containerId, serviceName, span))
-			return
-		}
-	} else if span.Kind() == ptrace.SpanKindConsumer {
-		entryUrl = span.Name()
 	}
 	p.aggregateMetricsForSpan(pid, containerId, serviceName, entryUrl, span)
 }

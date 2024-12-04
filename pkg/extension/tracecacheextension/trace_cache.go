@@ -55,8 +55,8 @@ func (tce *TraceCacheExtension) Shutdown(context.Context) error {
 	return nil
 }
 
-func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.TraceID]*tracecache.TraceMapping {
-	result := make(map[pcommon.TraceID]*tracecache.TraceMapping)
+func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.TraceID]tracecache.SpanMapping {
+	result := make(map[pcommon.TraceID]tracecache.SpanMapping)
 
 	resourceSpans := traces.ResourceSpans()
 	for i := 0; i < resourceSpans.Len(); i++ {
@@ -76,7 +76,7 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 			traceData := d.(*TraceData)
 			traceData.CacheTrace(&resource, spans)
 
-			result[id] = traceData.traceMapping
+			result[id] = traceData.spanMapping
 		}
 	}
 	return result
@@ -98,10 +98,10 @@ func groupSpansByTraceId(resourceSpans ptrace.ResourceSpans) map[pcommon.TraceID
 	return idToSpans
 }
 
-func (tce *TraceCacheExtension) GetTrace(id pcommon.TraceID) *tracecache.TraceMapping {
+func (tce *TraceCacheExtension) GetTrace(id pcommon.TraceID) tracecache.SpanMapping {
 	if d, loaded := tce.idToTrace.Load(id); loaded {
 		traceData := d.(*TraceData)
-		return traceData.traceMapping
+		return traceData.spanMapping
 	}
 	return nil
 }
