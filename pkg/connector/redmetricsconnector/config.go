@@ -1,8 +1,15 @@
 package redmetricsconnector
 
-import "time"
+import (
+	"time"
+
+	"go.opentelemetry.io/collector/component"
+)
 
 type Config struct {
+	ExtensionID *component.ID `mapstructure:"tracecache_extension"`
+	// 未匹配的ExitSpan缓存时间
+	UnMatchSpanExpireTime time.Duration `mapstructure:"unmatch_span_expire_time"`
 	// 是否采集服务端RED指标
 	ServerEnabled bool `mapstructure:"server_enabled"`
 	// 是否采集对外调用RED指标

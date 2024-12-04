@@ -51,7 +51,7 @@ var (
 )
 
 type Parser interface {
-	Parse(logger *zap.Logger, pid string, containerId string, serviceName string, span ptrace.Span, spanAttr pcommon.Map, keyValue *cache.ReusedKeyValue) string
+	Parse(logger *zap.Logger, pid string, containerId string, serviceName string, entryUrl string, span *ptrace.Span, spanAttr pcommon.Map, keyValue *cache.ReusedKeyValue) string
 }
 
 func BuildServerKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, name string, topSpan bool, isError bool) string {
@@ -69,10 +69,11 @@ func BuildServerKey(keyValue *cache.ReusedKeyValue, pid string, containerId stri
 }
 
 // buildExternalKey Http/Rpc Red指标
-func BuildExternalKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, name string, peer string, system string, isError bool) string {
+func BuildExternalKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, entryUrl string, name string, peer string, system string, isError bool) string {
 	keyValue.Reset()
 	keyValue.
 		Add(keyServiceName, serviceName).
+		Add(keyContentKey, entryUrl).
 		Add(keyNodeName, NodeName).
 		Add(keyNodeIp, NodeIp).
 		Add(keyPid, pid).
@@ -85,10 +86,11 @@ func BuildExternalKey(keyValue *cache.ReusedKeyValue, pid string, containerId st
 }
 
 // buildDbKey DB Red指标
-func buildDbKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, dbSystem string, dbName string, name string, dbUrl string, isError bool) string {
+func buildDbKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, entryUrl string, dbSystem string, dbName string, name string, dbUrl string, isError bool) string {
 	keyValue.Reset()
 	keyValue.
 		Add(keyServiceName, serviceName).
+		Add(keyContentKey, entryUrl).
 		Add(keyNodeName, NodeName).
 		Add(keyNodeIp, NodeIp).
 		Add(keyPid, pid).
@@ -102,10 +104,11 @@ func buildDbKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, 
 }
 
 // buildMqKey ActiveMq / RabbitMq / RocketMq / Kafka Red指标
-func buildMqKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, name string, peer string, mqSystem string, isError bool, role string) string {
+func buildMqKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, entryUrl string, name string, peer string, mqSystem string, isError bool, role string) string {
 	keyValue.Reset()
 	keyValue.
 		Add(keyServiceName, serviceName).
+		Add(keyContentKey, entryUrl).
 		Add(keyNodeName, NodeName).
 		Add(keyNodeIp, NodeIp).
 		Add(keyPid, pid).

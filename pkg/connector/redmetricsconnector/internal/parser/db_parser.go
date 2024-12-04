@@ -18,7 +18,7 @@ func NewDbParser() *DbParser {
 	return &DbParser{}
 }
 
-func (parser *DbParser) Parse(logger *zap.Logger, pid string, containerId string, serviceName string, span ptrace.Span, spanAttr pcommon.Map, keyValue *cache.ReusedKeyValue) string {
+func (parser *DbParser) Parse(logger *zap.Logger, pid string, containerId string, serviceName string, entryUrl string, span *ptrace.Span, spanAttr pcommon.Map, keyValue *cache.ReusedKeyValue) string {
 	if span.Kind() != ptrace.SpanKindClient {
 		return ""
 	}
@@ -64,7 +64,7 @@ func (parser *DbParser) Parse(logger *zap.Logger, pid string, containerId string
 			name = span.Name()
 		}
 	}
-	return buildDbKey(keyValue, pid, containerId, serviceName,
+	return buildDbKey(keyValue, pid, containerId, serviceName, entryUrl,
 		dbSystem, dbName,
 		name,                    // SELECT db.table
 		GetClientPeer(spanAttr), // ip:port

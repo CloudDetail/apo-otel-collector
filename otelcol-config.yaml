@@ -1,3 +1,7 @@
+extensions:
+  trace_cache:
+    enable: true
+    wait_time: 30s
 receivers:
   otlp:
     protocols:
@@ -37,6 +41,10 @@ processors:
       fetch_server_port: 8080
 connectors:
   redmetrics:
+    # 使用tracecache扩展插件，分析对外调用的服务URL.
+    tracecache_extension: trace_cache
+    # 未匹配入口URL的Span缓存时间
+    unmatch_span_expire_time: 60s
     # 开启服务端RED指标生成
     server_enabled: true
     # 开启DB RED指标生成
@@ -121,6 +129,7 @@ service:
       level: info
     metrics:
       level: none
+  extensions: [trace_cache]
   pipelines:
     traces:
       receivers: [otlp, skywalking]

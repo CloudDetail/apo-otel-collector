@@ -5,6 +5,7 @@ package main
 import (
 	redmetricsconnector "github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector"
 	fillprocextension "github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension"
+	tracecacheextension "github.com/CloudDetail/apo-otel-collector/pkg/extension/tracecacheextension"
 	metadataprocessor "github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor"
 	otlpreceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver"
 	skywalkingreceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver"
@@ -37,6 +38,7 @@ func components() (otelcol.Factories, error) {
 
 	factories.Extensions, err = extension.MakeFactoryMap(
 		fillprocextension.NewFactory(),
+		tracecacheextension.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

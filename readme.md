@@ -132,3 +132,22 @@ service:
     traces:
       receivers: [skywalking, otlp]
 ```
+
+## TraceCacheExtension
+TraceCacheExtension插件 缓存Trace记录
+用于 Red对外调用指标补充服务URL
+```yaml
+extensions:
+  trace_cache:
+    enable: true
+    wait_time: 30s
+
+connectors:
+  redmetrics:
+    # 使用tracecache扩展插件，分析对外调用的服务URL.
+    tracecache_extension: trace_cache
+    # 未匹配入口URL的Span缓存时间
+    unmatch_span_expire_time: 60s
+
+service:
+  extensions: [trace_cache]

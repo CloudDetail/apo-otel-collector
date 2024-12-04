@@ -25,8 +25,11 @@ func NewFactory() connector.Factory {
 
 func createDefaultConfig() component.Config {
 	return &Config{
+		UnMatchSpanExpireTime:          60 * time.Second,
 		ServerEnabled:                  false,
+		ExternalEnabled:                false,
 		DbEnabled:                      false,
+		MqEnabled:                      false,
 		DimensionsCacheSize:            1000,
 		MetricsFlushInterval:           60 * time.Second,
 		MaxServicesToTrack:             256,
