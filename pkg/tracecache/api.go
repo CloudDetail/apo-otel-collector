@@ -18,5 +18,5 @@ type SpanMapping interface {
 
 type Sampler interface {
 	Name() string
-	Sample(id pcommon.TraceID, traces *ptrace.Traces)
+	Sample(id pcommon.TraceID, traces *ptrace.Traces, isWaited bool)
 }

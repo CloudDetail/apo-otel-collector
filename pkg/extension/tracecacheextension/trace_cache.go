@@ -78,7 +78,7 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 			traceData := d.(*traceData)
 			if toSendTraces := traceData.CacheTraceSpans(&resource, spans); toSendTraces != nil && tce.sampler != nil {
 				// 针对超时场景 --- 超过sampleTime，后续到达的Trace数据，直接转发而不是再等待sampleTime
-				tce.sampler.Sample(id, toSendTraces)
+				tce.sampler.Sample(id, toSendTraces, false)
 			}
 
 			result[id] = traceData.spanMapping
@@ -125,7 +125,7 @@ func (tce *TraceCacheExtension) cleanOnTick() {
 			}
 			traceData := d.(*traceData)
 			// 通知采样器分析Trace数据
-			tce.sampler.Sample(id, traceData.traces)
+			tce.sampler.Sample(id, traceData.traces, true)
 
 			// 清理Trace 内存数据，对于后续TraceId数据直接发送不做缓存
 			traceData.CleanCacheTrace()
