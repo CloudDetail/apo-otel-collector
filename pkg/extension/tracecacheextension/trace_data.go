@@ -7,52 +7,70 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 
-type TraceData struct {
-	lock        sync.Mutex
-	traces      *ptrace.Traces
-	spanMapping *spanTraceMapping
+type traceData struct {
+	lock            sync.Mutex
+	sendImmediately bool
+	traces          *ptrace.Traces
+	spanMapping     *spanTraceMapping
 }
 
-func NewTraceData() *TraceData {
+func newTraceData() *traceData {
 	traces := ptrace.NewTraces()
-	return &TraceData{
-		traces:      &traces,
-		spanMapping: newSpanTraceMapping(),
+	return &traceData{
+		sendImmediately: false,
+		traces:          &traces,
+		spanMapping:     newSpanTraceMapping(),
 	}
 }
 
-func (traceData *TraceData) CacheTrace(resource *pcommon.Resource, spans []*ptrace.Span) bool {
+func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptrace.Span) *ptrace.Traces {
 	newSpan := false
 	for _, span := range spans {
 		// 存在多个组件同时使用该Extension，避免数据重复插入
-		if _, found := traceData.spanMapping.spanIdMap[span.SpanID()]; !found {
+		if _, found := data.spanMapping.spanIdMap[span.SpanID()]; !found {
 			newSpan = true
 			break
 		}
 	}
 	if !newSpan {
-		return false
+		return nil
 	}
 
-	traceData.lock.Lock()
-	rs := traceData.traces.ResourceSpans().AppendEmpty()
+	data.lock.Lock()
+	defer data.lock.Unlock()
+
+	traces := data.traces
+	if data.sendImmediately {
+		ptraces := ptrace.NewTraces()
+		traces = &ptraces
+	}
+	rs := traces.ResourceSpans().AppendEmpty()
 	resource.CopyTo(rs.Resource())
 	ils := rs.ScopeSpans().AppendEmpty()
 	for _, span := range spans {
-		if _, found := traceData.spanMapping.spanIdMap[span.SpanID()]; !found {
+		if _, found := data.spanMapping.spanIdMap[span.SpanID()]; !found {
 			sp := ils.Spans().AppendEmpty()
 			span.CopyTo(sp)
 
 			// 记录Mapping映射关系
 			if span.Kind() == ptrace.SpanKindServer || span.Kind() == ptrace.SpanKindConsumer {
-				traceData.spanMapping.entrySpanNameMap[span.SpanID()] = span.Name()
+				data.spanMapping.entrySpanNameMap[span.SpanID()] = span.Name()
 			}
-			traceData.spanMapping.spanIdMap[span.SpanID()] = span.ParentSpanID()
+			data.spanMapping.spanIdMap[span.SpanID()] = span.ParentSpanID()
 		}
 	}
-	traceData.lock.Unlock()
 
-	return true
+	if data.sendImmediately {
+		return traces
+	}
+	return nil
+}
+
+func (data *traceData) CleanCacheTrace() {
+	data.lock.Lock()
+	data.traces = nil
+	data.sendImmediately = true
+	data.lock.Unlock()
 }
 
 type spanTraceMapping struct {

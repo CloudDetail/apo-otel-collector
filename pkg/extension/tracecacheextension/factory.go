@@ -25,7 +25,7 @@ func createExtension(_ context.Context, settings extension.Settings, cfg compone
 
 func createDefaultConfig() component.Config {
 	return &Config{
-		Enable:   true,
-		WaitTime: 30 * time.Second,
+		Enable:    true,
+		CleanTime: 30 * time.Second,
 	}
 }

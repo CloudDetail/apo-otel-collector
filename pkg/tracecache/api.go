@@ -7,9 +7,16 @@ import (
 
 type TraceCache interface {
 	CacheTrace(traces ptrace.Traces) map[pcommon.TraceID]SpanMapping
-	GetTrace(id pcommon.TraceID) SpanMapping
+
+	// 设置采样器
+	SetSampler(sampler Sampler)
 }
 
 type SpanMapping interface {
 	GetEntrySpanName(spanId pcommon.SpanID) string
+}
+
+type Sampler interface {
+	Name() string
+	Sample(id pcommon.TraceID, traces *ptrace.Traces)
 }
