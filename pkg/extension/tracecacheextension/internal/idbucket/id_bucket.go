@@ -94,7 +94,7 @@ func (bucket *Bucket) CopyAndGetBatches(batch Batch) (sampleBatch Batch, toClean
 	bucket.buckets[bucket.writeIndex] = nil
 	bucket.readIndex++
 	if bucket.readIndex > bucket.size {
-		bucket.writeIndex = 0
+		bucket.readIndex = 0
 	}
 	return
 }
