@@ -2,11 +2,13 @@ package tracecacheextension
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/CloudDetail/apo-otel-collector/pkg/common/timeutils"
-	"github.com/CloudDetail/apo-otel-collector/pkg/extension/tracecacheextension/internal/idbucket"
+	"github.com/CloudDetail/apo-otel-collector/pkg/extension/tracecacheextension/internal/bucket"
 	"github.com/CloudDetail/apo-otel-collector/pkg/tracecache"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/extension"
@@ -18,26 +20,27 @@ import (
 type TraceCacheExtension struct {
 	logger          *zap.Logger
 	idToTrace       sync.Map
-	writeBatch      *idbucket.WriteableBatch // 缓存当前秒的TraceId列表
-	bucket          *idbucket.Bucket         // 记录每秒TraceId分桶数据
-	cleanTicker     timeutils.TTicker        // 定时清理分桶数据
+	idBatch         *bucket.WriteableBatch[pcommon.TraceID] // 缓存当前秒的TraceId列表
+	idbucket        *bucket.Bucket[pcommon.TraceID]         // 记录每秒TraceId分桶数据
+	traceBatch      *bucket.WriteableBatch[*delayTrace]     // 缓存当前秒待发送的Trace列表
+	traceBucket     *bucket.Bucket[*delayTrace]             // 缓存当前秒待发送的Trace分桶数据
+	cleanTicker     timeutils.TTicker                       // 定时清理分桶数据
 	tickerFrequency time.Duration
 	sampler         tracecache.Sampler
 }
 
 func newTraceCacheExtension(settings extension.Settings, cfg *Config) (*TraceCacheExtension, error) {
 	numCleanBatches := int(cfg.CleanTime.Seconds())
-	numSampleBatches := int(cfg.SampleTime.Seconds())
 
-	bucket, err := idbucket.NewBucket(numSampleBatches, numCleanBatches)
+	idbucket, err := bucket.NewBucket[pcommon.TraceID](numCleanBatches, "clean_time")
 	if err != nil {
 		return nil, err
 	}
 
 	tce := &TraceCacheExtension{
 		logger:          settings.Logger,
-		writeBatch:      idbucket.NewWriteableBatch(),
-		bucket:          bucket,
+		idBatch:         bucket.NewWriteableBatch[pcommon.TraceID](),
+		idbucket:        idbucket,
 		tickerFrequency: time.Second,
 	}
 
@@ -73,14 +76,14 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 			}
 			if !loaded {
 				// 新的Bucket记录TraceId
-				tce.writeBatch.AddToBatch(id)
+				tce.idBatch.AddToBatch(id)
 			}
 			traceData := d.(*traceData)
-			if toSendTraces := traceData.CacheTraceSpans(&resource, spans); toSendTraces != nil && tce.sampler != nil {
-				// 针对超时场景 --- 超过sampleTime，后续到达的Trace数据，直接转发而不是再等待sampleTime
-				tce.sampler.Sample(id, toSendTraces, false)
+			toSendTraces := traceData.CacheTraceSpans(&resource, spans)
+			if tce.sampler != nil && toSendTraces != nil {
+				// 针对超时场景 --- 超过sampleTime，后续到达的Trace数据，不再缓存SampleTime，而是DelayTime.
+				tce.traceBatch.AddToBatch(newDelayTrace(id, toSendTraces))
 			}
-
 			result[id] = traceData.spanMapping
 		}
 	}
@@ -103,37 +106,71 @@ func groupSpansByTraceId(resourceSpans ptrace.ResourceSpans) map[pcommon.TraceID
 	return idToSpans
 }
 
-func (tce *TraceCacheExtension) SetSampler(sampler tracecache.Sampler) {
+func (tce *TraceCacheExtension) SetSampler(sampler tracecache.Sampler) error {
 	if tce.sampler == nil {
+		if tce.sampler.GetSampleTime() <= 0 {
+			return errors.New("invalid number of sample_time, it must more than zero")
+		}
+		if tce.sampler.GetSampleTime() >= tce.idbucket.GetCleanPeriod() {
+			return fmt.Errorf("invalid number of sample_time, it must less than clean_period: %d", tce.idbucket.GetCleanPeriod())
+		}
+		if tce.sampler.GetDelayTime() >= tce.sampler.GetSampleTime() {
+			return fmt.Errorf("invalid number of delay_time, it must less than sample_time: %d", tce.sampler.GetSampleTime())
+
+		}
+		traceBucket, err := bucket.NewBucket[*delayTrace](tce.sampler.GetDelayTime(), "delay_time")
+		if err != nil {
+			return err
+		}
+		tce.traceBatch = bucket.NewWriteableBatch[*delayTrace]()
+		tce.traceBucket = traceBucket
 		tce.sampler = sampler
 	} else {
 		tce.logger.Warn("more than one sampler for traceCache",
 			zap.String("name[1]", tce.sampler.Name()),
 			zap.String("name[2]", sampler.Name()))
 	}
+	return nil
 }
 
 func (tce *TraceCacheExtension) cleanOnTick() {
-	currentBatch := tce.writeBatch.GetAndReset()
-	sampleBatch, expireBatch := tce.bucket.CopyAndGetBatches(currentBatch)
+	currentIdBatch := tce.idBatch.GetAndReset()
 
-	if tce.sampler != nil {
-		for _, id := range sampleBatch {
-			d, ok := tce.idToTrace.Load(id)
-			if !ok {
-				continue
+	if tce.sampler == nil {
+		expireIdBatch := tce.idbucket.CopyAndGetBatch(currentIdBatch)
+		tce.cleanExpireTraceIds(expireIdBatch)
+	} else {
+		closeIdBatch, sampleIdBatch, expireIdBatch := tce.idbucket.CopyAndGetBatches(currentIdBatch, tce.sampler.GetDelayTime(), tce.sampler.GetSampleTime())
+		for _, id := range closeIdBatch {
+			if d, ok := tce.idToTrace.Load(id); ok {
+				traceData := d.(*traceData)
+				// 后续该TraceId数据直接发送不做缓存
+				traceData.CloseWriteTrace()
 			}
-			traceData := d.(*traceData)
-			// 通知采样器分析Trace数据
-			tce.sampler.Sample(id, traceData.traces, true)
+		}
+		for _, id := range sampleIdBatch {
+			if d, ok := tce.idToTrace.Load(id); ok {
+				traceData := d.(*traceData)
+				// 通知采样器分析Trace数据
+				tce.sampler.Sample(id, traceData.traces)
+				// 释放Trace 内存数据
+				traceData.CleanCacheTrace()
+			}
+		}
+		tce.cleanExpireTraceIds(expireIdBatch)
 
-			// 清理Trace 内存数据，对于后续TraceId数据直接发送不做缓存
-			traceData.CleanCacheTrace()
+		// 延迟推送Trace
+		currentTraceBatch := tce.traceBatch.GetAndReset()
+		expireTraceBatch := tce.traceBucket.CopyAndGetBatch(currentTraceBatch)
+		for _, delayTrace := range expireTraceBatch {
+			tce.sampler.Sample(delayTrace.id, delayTrace.traces)
 		}
 	}
+}
 
+func (tce *TraceCacheExtension) cleanExpireTraceIds(expireIdBatch bucket.Batch[pcommon.TraceID]) {
 	cleanCount := 0
-	for _, id := range expireBatch {
+	for _, id := range expireIdBatch {
 		_, ok := tce.idToTrace.Load(id)
 		if !ok {
 			continue

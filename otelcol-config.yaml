@@ -1,7 +1,6 @@
 extensions:
   trace_cache:
     enable: true
-    sample_time: 30s
     clean_time: 60s
 receivers:
   otlp:

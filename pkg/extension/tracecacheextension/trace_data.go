@@ -2,6 +2,7 @@ package tracecacheextension
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -9,7 +10,7 @@ import (
 
 type traceData struct {
 	lock            sync.Mutex
-	sendImmediately bool
+	sendImmediately *atomic.Bool
 	traces          *ptrace.Traces
 	spanMapping     *spanTraceMapping
 }
@@ -17,7 +18,7 @@ type traceData struct {
 func newTraceData() *traceData {
 	traces := ptrace.NewTraces()
 	return &traceData{
-		sendImmediately: false,
+		sendImmediately: &atomic.Bool{},
 		traces:          &traces,
 		spanMapping:     newSpanTraceMapping(),
 	}
@@ -40,7 +41,7 @@ func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptra
 	defer data.lock.Unlock()
 
 	traces := data.traces
-	if data.sendImmediately {
+	if data.sendImmediately.Load() {
 		ptraces := ptrace.NewTraces()
 		traces = &ptraces
 	}
@@ -60,16 +61,23 @@ func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptra
 		}
 	}
 
-	if data.sendImmediately {
+	if data.sendImmediately.Load() {
 		return traces
 	}
 	return nil
 }
 
+func (data *traceData) CloseWriteTrace() {
+	// 考虑2种场景 - 不更新traces
+	// 1 - 数据刚更新，就触发采样，这类数据要快速延迟后通知采样
+	// 2 - 数据清理后又来了新的数据，这类数据要快速延迟通知采样
+
+	data.sendImmediately.Store(true)
+}
+
 func (data *traceData) CleanCacheTrace() {
 	data.lock.Lock()
 	data.traces = nil
-	data.sendImmediately = true
 	data.lock.Unlock()
 }
 
@@ -93,4 +101,16 @@ func (mapping *spanTraceMapping) GetEntrySpanName(spanId pcommon.SpanID) string 
 		return mapping.GetEntrySpanName(parent)
 	}
 	return ""
+}
+
+type delayTrace struct {
+	id     pcommon.TraceID
+	traces *ptrace.Traces
+}
+
+func newDelayTrace(id pcommon.TraceID, traces *ptrace.Traces) *delayTrace {
+	return &delayTrace{
+		id:     id,
+		traces: traces,
+	}
 }

@@ -140,7 +140,7 @@ TraceCacheExtension插件 缓存Trace记录
 extensions:
   trace_cache:
     enable: true
-    wait_time: 30s
+    clean_time: 60s
 
 connectors:
   redmetrics:

@@ -9,7 +9,7 @@ type TraceCache interface {
 	CacheTrace(traces ptrace.Traces) map[pcommon.TraceID]SpanMapping
 
 	// 设置采样器
-	SetSampler(sampler Sampler)
+	SetSampler(sampler Sampler) error
 }
 
 type SpanMapping interface {
@@ -18,5 +18,7 @@ type SpanMapping interface {
 
 type Sampler interface {
 	Name() string
-	Sample(id pcommon.TraceID, traces *ptrace.Traces, isWaited bool)
+	GetSampleTime() int
+	GetDelayTime() int
+	Sample(id pcommon.TraceID, traces *ptrace.Traces)
 }
