@@ -2,25 +2,22 @@ package tracecacheextension
 
 import (
 	"sync"
-	"sync/atomic"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 
 type traceData struct {
-	lock            sync.Mutex
-	sendImmediately *atomic.Bool
-	traces          *ptrace.Traces
-	spanMapping     *spanTraceMapping
+	lock        sync.Mutex
+	traces      *ptrace.Traces
+	spanMapping *spanTraceMapping
 }
 
 func newTraceData() *traceData {
 	traces := ptrace.NewTraces()
 	return &traceData{
-		sendImmediately: &atomic.Bool{},
-		traces:          &traces,
-		spanMapping:     newSpanTraceMapping(),
+		traces:      &traces,
+		spanMapping: newSpanTraceMapping(),
 	}
 }
 
@@ -41,7 +38,7 @@ func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptra
 	defer data.lock.Unlock()
 
 	traces := data.traces
-	if data.sendImmediately.Load() {
+	if traces == nil {
 		ptraces := ptrace.NewTraces()
 		traces = &ptraces
 	}
@@ -61,18 +58,10 @@ func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptra
 		}
 	}
 
-	if data.sendImmediately.Load() {
+	if data.traces == nil {
 		return traces
 	}
 	return nil
-}
-
-func (data *traceData) CloseWriteTrace() {
-	// 考虑2种场景 - 不更新traces
-	// 1 - 数据刚更新，就触发采样，这类数据要快速延迟后通知采样
-	// 2 - 数据清理后又来了新的数据，这类数据要快速延迟通知采样
-
-	data.sendImmediately.Store(true)
 }
 
 func (data *traceData) CleanCacheTrace() {
@@ -103,14 +92,40 @@ func (mapping *spanTraceMapping) GetEntrySpanName(spanId pcommon.SpanID) string 
 	return ""
 }
 
+type DelayTracePool interface {
+	Get() *delayTrace
+	Free(delayTrace *delayTrace)
+}
+
+type delayTracePool struct {
+	pool *sync.Pool
+}
+
+func createDelayTrace() interface{} {
+	return &delayTrace{}
+}
+
+func NewDelayTracePool() DelayTracePool {
+	return &delayTracePool{pool: &sync.Pool{New: createDelayTrace}}
+}
+
+func (p *delayTracePool) Get() *delayTrace {
+	return p.pool.Get().(*delayTrace)
+}
+
+func (p *delayTracePool) Free(trace *delayTrace) {
+	trace.id = [16]byte{}
+	trace.traces = nil
+	p.pool.Put(trace)
+}
+
 type delayTrace struct {
 	id     pcommon.TraceID
 	traces *ptrace.Traces
 }
 
-func newDelayTrace(id pcommon.TraceID, traces *ptrace.Traces) *delayTrace {
-	return &delayTrace{
-		id:     id,
-		traces: traces,
-	}
+func (trace *delayTrace) With(id pcommon.TraceID, traces *ptrace.Traces) *delayTrace {
+	trace.id = id
+	trace.traces = traces
+	return trace
 }

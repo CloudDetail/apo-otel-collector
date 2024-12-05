@@ -81,65 +81,49 @@ func TestCopyAndGetBatches(t *testing.T) {
 
 	tests := []struct {
 		data       Batch[pcommon.TraceID]
-		closeWant  Batch[pcommon.TraceID]
 		sampleWant Batch[pcommon.TraceID]
 		expireWant Batch[pcommon.TraceID]
 	}{
 		{
 			data:       batch_0,
-			closeWant:  batch_empty,
 			sampleWant: batch_empty,
 			expireWant: batch_empty,
 		},
 		{
 			data:       batch_1,
-			closeWant:  batch_empty,
 			sampleWant: batch_empty,
 			expireWant: batch_empty,
 		},
 		{
 			data:       batch_2,
-			closeWant:  batch_0,
-			sampleWant: batch_empty,
-			expireWant: batch_empty,
-		},
-		{
-			data:       batch_3,
-			closeWant:  batch_1,
 			sampleWant: batch_0,
 			expireWant: batch_empty,
 		},
 		{
-			data:       batch_4,
-			closeWant:  batch_2,
+			data:       batch_3,
 			sampleWant: batch_1,
 			expireWant: batch_empty,
 		},
 		{
-			data:       batch_5,
-			closeWant:  batch_3,
+			data:       batch_4,
 			sampleWant: batch_2,
+			expireWant: batch_empty,
+		},
+		{
+			data:       batch_5,
+			sampleWant: batch_3,
 			expireWant: batch_0,
 		},
 		{
 			data:       batch_6,
-			closeWant:  batch_4,
-			sampleWant: batch_3,
+			sampleWant: batch_4,
 			expireWant: batch_1,
 		},
 	}
 
 	bucket, _ := NewBucket[pcommon.TraceID](5, "expire_time")
 	for i, test := range tests {
-		close, sample, expire := bucket.CopyAndGetBatches(test.data, 3, 1)
-		if len(close) != len(test.closeWant) {
-			t.Errorf("Test[%d] close size() = %v, want %v", i, len(close), len(test.sampleWant))
-		}
-		for j, closeGot := range close {
-			if closeGot != test.closeWant[j] {
-				t.Errorf("Test[%d] close[%d] = %v, want %v", i, j, closeGot.String(), test.closeWant[j].String())
-			}
-		}
+		sample, expire := bucket.CopyAndGetBatches(test.data, 2)
 		if len(sample) != len(test.sampleWant) {
 			t.Errorf("Test[%d] sample size() = %v, want %v", i, len(sample), len(test.sampleWant))
 		}

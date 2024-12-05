@@ -81,18 +81,12 @@ func (bucket *Bucket[T]) CopyAndGetBatch(batch Batch[T]) (toCleanBatch Batch[T])
 }
 
 // 同一线程执行，无需加锁
-func (bucket *Bucket[T]) CopyAndGetBatches(batch Batch[T], sampleTime int, delayTime int) (closeBatch Batch[T], sampleBatch Batch[T], toCleanBatch Batch[T]) {
-	sampleIndex := bucket.writeIndex + sampleTime
-	if sampleIndex >= bucket.size {
-		sampleIndex -= bucket.size
+func (bucket *Bucket[T]) CopyAndGetBatches(batch Batch[T], sampleTime int) (sampleBatch Batch[T], toCleanBatch Batch[T]) {
+	sampleIndex := bucket.writeIndex - sampleTime
+	if sampleIndex < 0 {
+		sampleIndex += bucket.size
 	}
 	sampleBatch = bucket.buckets[sampleIndex]
-
-	closeIndex := sampleIndex + delayTime
-	if closeIndex >= bucket.size {
-		closeIndex -= bucket.size
-	}
-	closeBatch = bucket.buckets[closeIndex]
 
 	toCleanBatch = bucket.CopyAndGetBatch(batch)
 	return

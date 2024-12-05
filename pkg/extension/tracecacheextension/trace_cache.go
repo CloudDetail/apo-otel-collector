@@ -27,6 +27,7 @@ type TraceCacheExtension struct {
 	cleanTicker     timeutils.TTicker                       // 定时清理分桶数据
 	tickerFrequency time.Duration
 	sampler         tracecache.Sampler
+	delayTracePool  DelayTracePool
 }
 
 func newTraceCacheExtension(settings extension.Settings, cfg *Config) (*TraceCacheExtension, error) {
@@ -82,7 +83,7 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 			toSendTraces := traceData.CacheTraceSpans(&resource, spans)
 			if tce.sampler != nil && toSendTraces != nil {
 				// 针对超时场景 --- 超过sampleTime，后续到达的Trace数据，不再缓存SampleTime，而是DelayTime.
-				tce.traceBatch.AddToBatch(newDelayTrace(id, toSendTraces))
+				tce.traceBatch.AddToBatch(tce.delayTracePool.Get().With(id, toSendTraces))
 			}
 			result[id] = traceData.spanMapping
 		}
@@ -122,6 +123,7 @@ func (tce *TraceCacheExtension) SetSampler(sampler tracecache.Sampler) error {
 		if err != nil {
 			return err
 		}
+		tce.delayTracePool = NewDelayTracePool()
 		tce.traceBatch = bucket.NewWriteableBatch[*delayTrace]()
 		tce.traceBucket = traceBucket
 		tce.sampler = sampler
@@ -140,30 +142,24 @@ func (tce *TraceCacheExtension) cleanOnTick() {
 		expireIdBatch := tce.idbucket.CopyAndGetBatch(currentIdBatch)
 		tce.cleanExpireTraceIds(expireIdBatch)
 	} else {
-		closeIdBatch, sampleIdBatch, expireIdBatch := tce.idbucket.CopyAndGetBatches(currentIdBatch, tce.sampler.GetDelayTime(), tce.sampler.GetSampleTime())
-		for _, id := range closeIdBatch {
-			if d, ok := tce.idToTrace.Load(id); ok {
-				traceData := d.(*traceData)
-				// 后续该TraceId数据直接发送不做缓存
-				traceData.CloseWriteTrace()
-			}
-		}
+		sampleIdBatch, expireIdBatch := tce.idbucket.CopyAndGetBatches(currentIdBatch, tce.sampler.GetSampleTime())
 		for _, id := range sampleIdBatch {
 			if d, ok := tce.idToTrace.Load(id); ok {
 				traceData := d.(*traceData)
-				// 通知采样器分析Trace数据
-				tce.sampler.Sample(id, traceData.traces)
+				// 延迟推送
+				tce.traceBatch.AddToBatch(tce.delayTracePool.Get().With(id, traceData.traces))
 				// 释放Trace 内存数据
 				traceData.CleanCacheTrace()
 			}
 		}
 		tce.cleanExpireTraceIds(expireIdBatch)
 
-		// 延迟推送Trace
+		// 获取 当前推送Trace
 		currentTraceBatch := tce.traceBatch.GetAndReset()
 		expireTraceBatch := tce.traceBucket.CopyAndGetBatch(currentTraceBatch)
 		for _, delayTrace := range expireTraceBatch {
 			tce.sampler.Sample(delayTrace.id, delayTrace.traces)
+			tce.delayTracePool.Free(delayTrace)
 		}
 	}
 }
