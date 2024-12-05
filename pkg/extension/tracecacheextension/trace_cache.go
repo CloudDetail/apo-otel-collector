@@ -108,17 +108,17 @@ func groupSpansByTraceId(resourceSpans ptrace.ResourceSpans) map[pcommon.TraceID
 
 func (tce *TraceCacheExtension) SetSampler(sampler tracecache.Sampler) error {
 	if tce.sampler == nil {
-		if tce.sampler.GetSampleTime() <= 0 {
+		if sampler.GetSampleTime() <= 0 {
 			return errors.New("invalid number of sample_time, it must more than zero")
 		}
-		if tce.sampler.GetSampleTime() >= tce.idbucket.GetCleanPeriod() {
+		if sampler.GetSampleTime() >= tce.idbucket.GetCleanPeriod() {
 			return fmt.Errorf("invalid number of sample_time, it must less than clean_period: %d", tce.idbucket.GetCleanPeriod())
 		}
-		if tce.sampler.GetDelayTime() >= tce.sampler.GetSampleTime() {
-			return fmt.Errorf("invalid number of delay_time, it must less than sample_time: %d", tce.sampler.GetSampleTime())
+		if sampler.GetDelayTime() >= sampler.GetSampleTime() {
+			return fmt.Errorf("invalid number of delay_time, it must less than sample_time: %d", sampler.GetSampleTime())
 
 		}
-		traceBucket, err := bucket.NewBucket[*delayTrace](tce.sampler.GetDelayTime(), "delay_time")
+		traceBucket, err := bucket.NewBucket[*delayTrace](sampler.GetDelayTime(), "delay_time")
 		if err != nil {
 			return err
 		}
