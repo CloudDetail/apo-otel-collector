@@ -19,6 +19,7 @@ import (
 
 type TraceCacheExtension struct {
 	logger          *zap.Logger
+	enable          bool
 	idToTrace       sync.Map
 	idBatch         *bucket.WriteableBatch // 缓存当前秒的TraceId列表
 	idbucket        *bucket.Bucket         // 记录每秒TraceId分桶数据
@@ -37,30 +38,35 @@ func newTraceCacheExtension(settings extension.Settings, cfg *Config) (*TraceCac
 
 	tce := &TraceCacheExtension{
 		logger:          settings.Logger,
+		enable:          cfg.Enable,
 		idBatch:         bucket.NewWriteableBatch(),
 		idbucket:        idbucket,
 		tickerFrequency: time.Second,
 	}
-
-	tce.cleanTicker = &timeutils.PolicyTicker{OnTickFunc: tce.cleanOnTick}
 	return tce, nil
 }
 
 func (tce *TraceCacheExtension) Start(context.Context, component.Host) error {
-	tce.logger.Info("Start traceCache Extension")
-
-	tce.cleanTicker.Start(tce.tickerFrequency)
+	if tce.enable {
+		tce.logger.Info("Start traceCache Extension")
+		tce.cleanTicker = &timeutils.PolicyTicker{OnTickFunc: tce.cleanOnTick}
+		tce.cleanTicker.Start(tce.tickerFrequency)
+	}
 	return nil
 }
 
 func (tce *TraceCacheExtension) Shutdown(context.Context) error {
-	tce.cleanTicker.Stop()
+	if tce.enable {
+		tce.cleanTicker.Stop()
+	}
 	return nil
 }
 
 func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.TraceID]tracecache.SpanMapping {
 	result := make(map[pcommon.TraceID]tracecache.SpanMapping)
-
+	if !tce.enable {
+		return result
+	}
 	hasSampler := tce.sampler != nil
 	resourceSpans := traces.ResourceSpans()
 	for i := 0; i < resourceSpans.Len(); i++ {
@@ -106,6 +112,9 @@ func groupSpansByTraceId(resourceSpans ptrace.ResourceSpans) map[pcommon.TraceID
 }
 
 func (tce *TraceCacheExtension) SetSampler(sampler tracecache.Sampler) error {
+	if !tce.enable {
+		return errors.New("trace cache is disabled")
+	}
 	if tce.sampler == nil {
 		if sampler.GetSampleTime() <= 0 {
 			return errors.New("invalid number of sample_time, it must more than zero")
@@ -127,7 +136,7 @@ func (tce *TraceCacheExtension) cleanOnTick() {
 
 	if tce.sampler == nil {
 		expireIdBatch := tce.idbucket.CopyAndGetBatch(currentIdBatch)
-		tce.cleanExpireTraceIds(expireIdBatch)
+		tce.cleanExpireTraces(expireIdBatch)
 	} else {
 		sampleIdBatch, expireIdBatch := tce.idbucket.CopyAndGetBatches(currentIdBatch, tce.sampler.GetSampleTime())
 		for _, id := range sampleIdBatch {
@@ -138,11 +147,11 @@ func (tce *TraceCacheExtension) cleanOnTick() {
 				traceData.CleanCacheTrace()
 			}
 		}
-		tce.cleanExpireTraceIds(expireIdBatch)
+		tce.cleanExpireTraces(expireIdBatch)
 	}
 }
 
-func (tce *TraceCacheExtension) cleanExpireTraceIds(expireIdBatch bucket.Batch) {
+func (tce *TraceCacheExtension) cleanExpireTraces(expireIdBatch bucket.Batch) {
 	cleanCount := 0
 	for _, id := range expireIdBatch {
 		_, ok := tce.idToTrace.Load(id)
