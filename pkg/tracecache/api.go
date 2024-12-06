@@ -6,6 +6,8 @@ import (
 )
 
 type TraceCache interface {
+	IsEnable() bool
+
 	CacheTrace(traces ptrace.Traces) map[pcommon.TraceID]SpanMapping
 
 	// 设置采样器

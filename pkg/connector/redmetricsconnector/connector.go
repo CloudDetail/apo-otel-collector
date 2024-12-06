@@ -223,7 +223,7 @@ func (p *connectorImp) Capabilities() consumer.Capabilities {
 func (p *connectorImp) ConsumeTraces(_ context.Context, traces ptrace.Traces) error {
 	resourceSpans := traces.ResourceSpans()
 
-	if p.traceCache != nil {
+	if p.traceCache != nil && p.traceCache.IsEnable() {
 		cachedTraces := p.traceCache.CacheTrace(traces)
 		p.lock.Lock()
 		// 遍历未匹配的ExitSpan列表

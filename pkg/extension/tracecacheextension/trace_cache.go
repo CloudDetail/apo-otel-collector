@@ -46,9 +46,13 @@ func newTraceCacheExtension(settings extension.Settings, cfg *Config) (*TraceCac
 	return tce, nil
 }
 
+func (tce *TraceCacheExtension) IsEnable() bool {
+	return tce.enable
+}
+
 func (tce *TraceCacheExtension) Start(context.Context, component.Host) error {
+	tce.logger.Info("Start traceCache Extension", zap.Bool("enable", tce.enable))
 	if tce.enable {
-		tce.logger.Info("Start traceCache Extension")
 		tce.cleanTicker = &timeutils.PolicyTicker{OnTickFunc: tce.cleanOnTick}
 		tce.cleanTicker.Start(tce.tickerFrequency)
 	}
@@ -112,9 +116,6 @@ func groupSpansByTraceId(resourceSpans ptrace.ResourceSpans) map[pcommon.TraceID
 }
 
 func (tce *TraceCacheExtension) SetSampler(sampler tracecache.Sampler) error {
-	if !tce.enable {
-		return errors.New("trace cache is disabled")
-	}
 	if tce.sampler == nil {
 		if sampler.GetSampleTime() <= 0 {
 			return errors.New("invalid number of sample_time, it must more than zero")
