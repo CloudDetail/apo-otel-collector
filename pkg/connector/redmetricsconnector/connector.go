@@ -151,7 +151,6 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		unMatchedSpans:                         make([]*resourceSpan, 0),
 		unMatchExpireTime:                      int64(pConfig.UnMatchSpanExpireTime.Seconds()),
 	}
-	connector.cleanUnMatcheTicker = &timeutils.PolicyTicker{OnTickFunc: connector.cleanUnMatcheOnTick}
 	return connector, nil
 }
 
@@ -180,8 +179,12 @@ func (p *connectorImp) Start(ctx context.Context, host component.Host) error {
 		p.logger.Warn("[Warning] Disable redmetrics connector")
 		return nil
 	}
-	if p.setTraceCache(host) {
+	if p.setTraceCache(host) && p.traceCache.IsEnable() {
+		p.logger.Info("Enable Add EntryUrl to Red Metric")
+		p.cleanUnMatcheTicker = &timeutils.PolicyTicker{OnTickFunc: p.cleanUnMatcheOnTick}
 		p.cleanUnMatcheTicker.Start(time.Second)
+	} else {
+		p.logger.Info("Disable Add EntryUrl to Red Metric")
 	}
 
 	p.started = true
@@ -203,6 +206,9 @@ func (p *connectorImp) Start(ctx context.Context, host component.Host) error {
 func (p *connectorImp) Shutdown(context.Context) error {
 	p.shutdownOnce.Do(func() {
 		p.logger.Info("Shutting down redmetrics connector")
+		if p.cleanUnMatcheTicker != nil {
+			p.cleanUnMatcheTicker.Stop()
+		}
 		if p.started {
 			p.logger.Info("Stopping ticker")
 			p.ticker.Stop()
@@ -232,13 +238,6 @@ func (p *connectorImp) ConsumeTraces(_ context.Context, traces ptrace.Traces) er
 			if spanMapping, found := cachedTraces[unMatchedSpan.Span.TraceID()]; found {
 				entryUrl := spanMapping.GetEntrySpanName(unMatchedSpan.Span.SpanID())
 				if entryUrl != "" {
-					// p.logger.Info("Found UnMatcheSpan",
-					// 	zap.String("traceId", unMatchedSpan.Span.TraceID().String()),
-					// 	zap.String("spanId", unMatchedSpan.Span.SpanID().String()),
-					// 	zap.String("entryUrl", entryUrl),
-					// 	zap.String("spanName", unMatchedSpan.Span.Name()),
-					// )
-
 					p.aggregateMetricsForSpan(unMatchedSpan.Pid, unMatchedSpan.ContainerId, unMatchedSpan.ServiceName, entryUrl, unMatchedSpan.Span)
 					// 删除已匹配的
 					p.unMatchedSpans = append(p.unMatchedSpans[:index], p.unMatchedSpans[index+1:]...)
@@ -308,12 +307,6 @@ func (p *connectorImp) processUrlSpan(spanMapping tracecache.SpanMapping, expire
 		if span.Kind() == ptrace.SpanKindClient || span.Kind() == ptrace.SpanKindProducer {
 			entryUrl = spanMapping.GetEntrySpanName(span.SpanID())
 			if entryUrl == "" {
-				// 未匹配的ExitSpan
-				// p.logger.Info("Add UnMatcheSpan",
-				// 	zap.String("traceId", span.TraceID().String()),
-				// 	zap.String("spanId", span.SpanID().String()),
-				// 	zap.String("spanName", span.Name()),
-				// )
 				// 只有对外调用 且 未匹配到
 				p.unMatchedSpans = append(p.unMatchedSpans, newResourceSpan(expireTime, pid, containerId, serviceName, span))
 				return
