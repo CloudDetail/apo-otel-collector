@@ -77,7 +77,7 @@ type connectorImp struct {
 
 	traceCache          tracecache.TraceCache
 	unMatchedSpans      []*resourceSpan
-	expireUnMatcheTime  int64
+	unMatchExpireTime   int64
 	cleanUnMatcheTicker timeutils.TTicker
 }
 
@@ -149,7 +149,7 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		maxNumberOfOperationsToTrackPerService: pConfig.MaxOperationsToTrackPerService,
 		metricsType:                            cache.GetMetricsType(pConfig.MetricsType),
 		unMatchedSpans:                         make([]*resourceSpan, 0),
-		expireUnMatcheTime:                     int64(pConfig.UnMatchSpanExpireTime.Seconds()),
+		unMatchExpireTime:                      int64(pConfig.UnMatchSpanExpireTime.Seconds()),
 	}
 	connector.cleanUnMatcheTicker = &timeutils.PolicyTicker{OnTickFunc: connector.cleanUnMatcheOnTick}
 	return connector, nil
@@ -248,7 +248,7 @@ func (p *connectorImp) ConsumeTraces(_ context.Context, traces ptrace.Traces) er
 		}
 		p.lock.Unlock()
 
-		expireTime := time.Now().Unix() + p.expireUnMatcheTime
+		expireTime := time.Now().Unix() + p.unMatchExpireTime
 		// 基于Resource遍历
 		for i := 0; i < resourceSpans.Len(); i++ {
 			rss := resourceSpans.At(i)

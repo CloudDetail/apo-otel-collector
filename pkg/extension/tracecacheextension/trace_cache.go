@@ -64,6 +64,7 @@ func (tce *TraceCacheExtension) Shutdown(context.Context) error {
 func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.TraceID]tracecache.SpanMapping {
 	result := make(map[pcommon.TraceID]tracecache.SpanMapping)
 
+	hasSampler := tce.sampler != nil
 	resourceSpans := traces.ResourceSpans()
 	for i := 0; i < resourceSpans.Len(); i++ {
 		rss := resourceSpans.At(i)
@@ -80,8 +81,8 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 				tce.idBatch.AddToBatch(id)
 			}
 			traceData := d.(*traceData)
-			toSendTraces := traceData.CacheTraceSpans(&resource, spans)
-			if tce.sampler != nil && toSendTraces != nil {
+			toSendTraces := traceData.CacheTraceSpans(&resource, spans, hasSampler)
+			if hasSampler && toSendTraces != nil {
 				// 针对超时场景 --- 超过sampleTime，后续到达的Trace数据，不再缓存SampleTime，而是DelayTime.
 				tce.traceBatch.AddToBatch(tce.delayTracePool.Get().With(id, toSendTraces))
 			}
