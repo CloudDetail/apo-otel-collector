@@ -19,6 +19,5 @@ type SpanMapping interface {
 type Sampler interface {
 	Name() string
 	GetSampleTime() int
-	GetDelayTime() int
 	Sample(id pcommon.TraceID, traces *ptrace.Traces)
 }

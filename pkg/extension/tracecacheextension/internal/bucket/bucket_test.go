@@ -9,19 +9,19 @@ import (
 
 func TestCopyAndGetBatch(t *testing.T) {
 	var (
-		batch_empty = Batch[pcommon.TraceID]([]pcommon.TraceID{})
-		batch_0     = Batch[pcommon.TraceID](genterateTraceIds(1, 5))
-		batch_1     = Batch[pcommon.TraceID](genterateTraceIds(5, 10))
-		batch_2     = Batch[pcommon.TraceID](genterateTraceIds(10, 13))
-		batch_3     = Batch[pcommon.TraceID](genterateTraceIds(13, 18))
-		batch_4     = Batch[pcommon.TraceID](genterateTraceIds(18, 30))
-		batch_5     = Batch[pcommon.TraceID](genterateTraceIds(30, 32))
-		batch_6     = Batch[pcommon.TraceID](genterateTraceIds(33, 40))
+		batch_empty = Batch([]pcommon.TraceID{})
+		batch_0     = Batch(genterateTraceIds(1, 5))
+		batch_1     = Batch(genterateTraceIds(5, 10))
+		batch_2     = Batch(genterateTraceIds(10, 13))
+		batch_3     = Batch(genterateTraceIds(13, 18))
+		batch_4     = Batch(genterateTraceIds(18, 30))
+		batch_5     = Batch(genterateTraceIds(30, 32))
+		batch_6     = Batch(genterateTraceIds(33, 40))
 	)
 
 	tests := []struct {
-		data       Batch[pcommon.TraceID]
-		expireWant Batch[pcommon.TraceID]
+		data       Batch
+		expireWant Batch
 	}{
 		{
 			data:       batch_0,
@@ -53,7 +53,7 @@ func TestCopyAndGetBatch(t *testing.T) {
 		},
 	}
 
-	bucket, _ := NewBucket[pcommon.TraceID](5, "expire_time")
+	bucket, _ := NewBucket(5, "expire_time")
 	for i, test := range tests {
 		expire := bucket.CopyAndGetBatch(test.data)
 		if len(expire) != len(test.expireWant) {
@@ -69,20 +69,20 @@ func TestCopyAndGetBatch(t *testing.T) {
 
 func TestCopyAndGetBatches(t *testing.T) {
 	var (
-		batch_empty = Batch[pcommon.TraceID]([]pcommon.TraceID{})
-		batch_0     = Batch[pcommon.TraceID](genterateTraceIds(1, 5))
-		batch_1     = Batch[pcommon.TraceID](genterateTraceIds(5, 10))
-		batch_2     = Batch[pcommon.TraceID](genterateTraceIds(10, 13))
-		batch_3     = Batch[pcommon.TraceID](genterateTraceIds(13, 18))
-		batch_4     = Batch[pcommon.TraceID](genterateTraceIds(18, 30))
-		batch_5     = Batch[pcommon.TraceID](genterateTraceIds(30, 32))
-		batch_6     = Batch[pcommon.TraceID](genterateTraceIds(33, 40))
+		batch_empty = Batch([]pcommon.TraceID{})
+		batch_0     = Batch(genterateTraceIds(1, 5))
+		batch_1     = Batch(genterateTraceIds(5, 10))
+		batch_2     = Batch(genterateTraceIds(10, 13))
+		batch_3     = Batch(genterateTraceIds(13, 18))
+		batch_4     = Batch(genterateTraceIds(18, 30))
+		batch_5     = Batch(genterateTraceIds(30, 32))
+		batch_6     = Batch(genterateTraceIds(33, 40))
 	)
 
 	tests := []struct {
-		data       Batch[pcommon.TraceID]
-		sampleWant Batch[pcommon.TraceID]
-		expireWant Batch[pcommon.TraceID]
+		data       Batch
+		sampleWant Batch
+		expireWant Batch
 	}{
 		{
 			data:       batch_0,
@@ -121,7 +121,7 @@ func TestCopyAndGetBatches(t *testing.T) {
 		},
 	}
 
-	bucket, _ := NewBucket[pcommon.TraceID](5, "expire_time")
+	bucket, _ := NewBucket(5, "expire_time")
 	for i, test := range tests {
 		sample, expire := bucket.CopyAndGetBatches(test.data, 2)
 		if len(sample) != len(test.sampleWant) {
