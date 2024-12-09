@@ -179,7 +179,7 @@ func (p *connectorImp) Start(ctx context.Context, host component.Host) error {
 		p.logger.Warn("[Warning] Disable redmetrics connector")
 		return nil
 	}
-	if p.setTraceCache(host) && p.traceCache.IsEnable() {
+	if p.unMatchExpireTime > 0 && p.setTraceCache(host) && p.traceCache.IsEnable() {
 		p.logger.Info("Enable Add EntryUrl to Red Metric")
 		p.cleanUnMatcheTicker = &timeutils.PolicyTicker{OnTickFunc: p.cleanUnMatcheOnTick}
 		p.cleanUnMatcheTicker.Start(time.Second)
@@ -229,7 +229,7 @@ func (p *connectorImp) Capabilities() consumer.Capabilities {
 func (p *connectorImp) ConsumeTraces(_ context.Context, traces ptrace.Traces) error {
 	resourceSpans := traces.ResourceSpans()
 
-	if p.traceCache != nil && p.traceCache.IsEnable() {
+	if p.unMatchExpireTime > 0 && p.traceCache != nil && p.traceCache.IsEnable() {
 		cachedTraces := p.traceCache.CacheTrace(traces)
 		p.lock.Lock()
 		// 遍历未匹配的ExitSpan列表
