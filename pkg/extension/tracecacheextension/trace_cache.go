@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/CloudDetail/apo-otel-collector/pkg/common/timeutils"
@@ -18,14 +19,15 @@ import (
 )
 
 type TraceCacheExtension struct {
-	logger          *zap.Logger
-	enable          bool
-	idToTrace       sync.Map
-	idBatch         *bucket.WriteableBatch // 缓存当前秒的TraceId列表
-	idbucket        *bucket.Bucket         // 记录每秒TraceId分桶数据
-	cleanTicker     timeutils.TTicker      // 定时清理分桶数据
-	tickerFrequency time.Duration
-	sampler         tracecache.Sampler
+	logger           *zap.Logger
+	enable           bool
+	idToTrace        sync.Map
+	idBatch          *bucket.WriteableBatch // 缓存当前秒的TraceId列表
+	idbucket         *bucket.Bucket         // 记录每秒TraceId分桶数据
+	cleanTicker      timeutils.TTicker      // 定时清理分桶数据
+	tickerFrequency  time.Duration
+	activeTraceCount *atomic.Int64
+	sampler          tracecache.Sampler
 }
 
 func newTraceCacheExtension(settings extension.Settings, cfg *Config) (*TraceCacheExtension, error) {
@@ -37,11 +39,12 @@ func newTraceCacheExtension(settings extension.Settings, cfg *Config) (*TraceCac
 	}
 
 	tce := &TraceCacheExtension{
-		logger:          settings.Logger,
-		enable:          cfg.Enable,
-		idBatch:         bucket.NewWriteableBatch(),
-		idbucket:        idbucket,
-		tickerFrequency: time.Second,
+		logger:           settings.Logger,
+		enable:           cfg.Enable,
+		idBatch:          bucket.NewWriteableBatch(),
+		idbucket:         idbucket,
+		tickerFrequency:  time.Second,
+		activeTraceCount: &atomic.Int64{},
 	}
 	return tce, nil
 }
@@ -84,6 +87,7 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 				d, loaded = tce.idToTrace.LoadOrStore(id, newTraceData())
 			}
 			if !loaded {
+				tce.activeTraceCount.Add(1)
 				// 新的Bucket记录TraceId
 				tce.idBatch.AddToBatch(id)
 			}
@@ -153,7 +157,7 @@ func (tce *TraceCacheExtension) cleanOnTick() {
 }
 
 func (tce *TraceCacheExtension) cleanExpireTraces(expireIdBatch bucket.Batch) {
-	cleanCount := 0
+	var cleanCount int64 = 0
 	for _, id := range expireIdBatch {
 		_, ok := tce.idToTrace.Load(id)
 		if !ok {
@@ -165,6 +169,7 @@ func (tce *TraceCacheExtension) cleanExpireTraces(expireIdBatch bucket.Batch) {
 		cleanCount += 1
 	}
 	if cleanCount > 0 {
-		tce.logger.Info("[Clean CachedTrace]", zap.Int("count", cleanCount))
+		currentCount := tce.activeTraceCount.Add(-cleanCount)
+		tce.logger.Info("[Clean CachedTrace]", zap.Int64("deleteNum", cleanCount), zap.Int64("activeNum", currentCount))
 	}
 }
