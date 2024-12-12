@@ -3,25 +3,25 @@ package tracecacheextension
 import (
 	"sync"
 
+	"github.com/CloudDetail/apo-otel-collector/pkg/tracecache"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 
 type traceData struct {
 	traceLock   sync.Mutex
-	traces      *ptrace.Traces
+	traces      []*tracecache.TraceData
 	spanMapping *spanTraceMapping
 }
 
 func newTraceData() *traceData {
-	traces := ptrace.NewTraces()
 	return &traceData{
-		traces:      &traces,
+		traces:      make([]*tracecache.TraceData, 0),
 		spanMapping: newSpanTraceMapping(),
 	}
 }
 
-func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptrace.Span, buildTrace bool) *ptrace.Traces {
+func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptrace.Span, buildTrace bool) []*tracecache.TraceData {
 	newSpans := make([]*ptrace.Span, 0)
 	for _, span := range spans {
 		// 存在多个组件同时使用该Extension，避免数据重复插入
@@ -35,34 +35,23 @@ func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptra
 
 	if buildTrace {
 		if data.traces == nil {
-			traces := ptrace.NewTraces()
-			rs := traces.ResourceSpans().AppendEmpty()
-			resource.CopyTo(rs.Resource())
-			ils := rs.ScopeSpans().AppendEmpty()
-			for _, span := range newSpans {
-				sp := ils.Spans().AppendEmpty()
-				span.CopyTo(sp)
-			}
-			return &traces
+			return []*tracecache.TraceData{tracecache.NewTraceData(resource, newSpans)}
 		} else {
 			data.traceLock.Lock()
-			rs := data.traces.ResourceSpans().AppendEmpty()
-			resource.CopyTo(rs.Resource())
-			ils := rs.ScopeSpans().AppendEmpty()
-			for _, span := range newSpans {
-				sp := ils.Spans().AppendEmpty()
-				span.CopyTo(sp)
-			}
+			data.traces = append(data.traces, tracecache.NewTraceData(resource, newSpans))
 			data.traceLock.Unlock()
 		}
 	}
 	return nil
 }
 
-func (data *traceData) CleanCacheTrace() {
+func (data *traceData) GetAndCleanCacheTrace() []*tracecache.TraceData {
 	data.traceLock.Lock()
+	defer data.traceLock.Unlock()
+
+	result := data.traces
 	data.traces = nil
-	data.traceLock.Unlock()
+	return result
 }
 
 type spanTraceMapping struct {

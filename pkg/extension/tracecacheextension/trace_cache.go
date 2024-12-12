@@ -93,7 +93,7 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 				tce.idBatch.AddToBatch(id)
 			}
 			toSendTraces := traceData.CacheTraceSpans(&resource, spans, hasSampler)
-			if hasSampler && toSendTraces != nil {
+			if hasSampler && len(toSendTraces) > 0 {
 				// 针对超时场景 --- 超过sampleTime，后续到达的Trace数据，不再缓存SampleTime.
 				tce.sampler.Sample(id, toSendTraces)
 			}
@@ -146,9 +146,8 @@ func (tce *TraceCacheExtension) cleanOnTick() {
 		sampleIdBatch, expireIdBatch := tce.idbucket.CopyAndGetBatches(currentIdBatch, tce.sampler.GetSampleTime())
 		for _, id := range sampleIdBatch {
 			if traceData, ok := tce.idToTrace.Load(id); ok {
-				tce.sampler.Sample(id, traceData.traces)
 				// 释放Trace 内存数据
-				traceData.CleanCacheTrace()
+				tce.sampler.Sample(id, traceData.GetAndCleanCacheTrace())
 			}
 		}
 		tce.cleanExpireTraces(expireIdBatch)

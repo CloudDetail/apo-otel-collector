@@ -21,5 +21,31 @@ type SpanMapping interface {
 type Sampler interface {
 	Name() string
 	GetSampleTime() int
-	Sample(id pcommon.TraceID, traces *ptrace.Traces)
+	Sample(id pcommon.TraceID, traces []*TraceData)
+}
+
+type TraceData struct {
+	Resource *pcommon.Resource
+	Spans    []*ptrace.Span
+}
+
+func NewTraceData(resource *pcommon.Resource, spans []*ptrace.Span) *TraceData {
+	return &TraceData{
+		Resource: resource,
+		Spans:    spans,
+	}
+}
+
+func BuildTraces(traceDatas []*TraceData) ptrace.Traces {
+	traces := ptrace.NewTraces()
+	for _, traceData := range traceDatas {
+		rs := traces.ResourceSpans().AppendEmpty()
+		traceData.Resource.CopyTo(rs.Resource())
+		ils := rs.ScopeSpans().AppendEmpty()
+		for _, span := range traceData.Spans {
+			sp := ils.Spans().AppendEmpty()
+			span.CopyTo(sp)
+		}
+	}
+	return traces
 }
