@@ -21,7 +21,7 @@ import (
 type TraceCacheExtension struct {
 	logger           *zap.Logger
 	enable           bool
-	idToTrace        sync.Map
+	idToTrace        *RWMap[pcommon.TraceID, *traceData]
 	idBatch          *bucket.WriteableBatch // 缓存当前秒的TraceId列表
 	idbucket         *bucket.Bucket         // 记录每秒TraceId分桶数据
 	cleanTicker      timeutils.TTicker      // 定时清理分桶数据
@@ -41,6 +41,7 @@ func newTraceCacheExtension(settings extension.Settings, cfg *Config) (*TraceCac
 	tce := &TraceCacheExtension{
 		logger:           settings.Logger,
 		enable:           cfg.Enable,
+		idToTrace:        NewRWMap[pcommon.TraceID, *traceData](),
 		idBatch:          bucket.NewWriteableBatch(),
 		idbucket:         idbucket,
 		tickerFrequency:  time.Second,
@@ -82,16 +83,15 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 		idToSpans := groupSpansByTraceId(rss)
 		for id, spans := range idToSpans {
 			// 先缓存Trace数据
-			d, loaded := tce.idToTrace.Load(id)
+			traceData, loaded := tce.idToTrace.Load(id)
 			if !loaded {
-				d, loaded = tce.idToTrace.LoadOrStore(id, newTraceData())
+				traceData, loaded = tce.idToTrace.LoadOrStore(id, newTraceData())
 			}
 			if !loaded {
 				tce.activeTraceCount.Add(1)
 				// 新的Bucket记录TraceId
 				tce.idBatch.AddToBatch(id)
 			}
-			traceData := d.(*traceData)
 			toSendTraces := traceData.CacheTraceSpans(&resource, spans, hasSampler)
 			if hasSampler && toSendTraces != nil {
 				// 针对超时场景 --- 超过sampleTime，后续到达的Trace数据，不再缓存SampleTime.
@@ -145,8 +145,7 @@ func (tce *TraceCacheExtension) cleanOnTick() {
 	} else {
 		sampleIdBatch, expireIdBatch := tce.idbucket.CopyAndGetBatches(currentIdBatch, tce.sampler.GetSampleTime())
 		for _, id := range sampleIdBatch {
-			if d, ok := tce.idToTrace.Load(id); ok {
-				traceData := d.(*traceData)
+			if traceData, ok := tce.idToTrace.Load(id); ok {
 				tce.sampler.Sample(id, traceData.traces)
 				// 释放Trace 内存数据
 				traceData.CleanCacheTrace()
@@ -172,4 +171,41 @@ func (tce *TraceCacheExtension) cleanExpireTraces(expireIdBatch bucket.Batch) {
 		currentCount := tce.activeTraceCount.Add(-cleanCount)
 		tce.logger.Info("[Clean CachedTrace]", zap.Int64("deleteNum", cleanCount), zap.Int64("activeNum", currentCount))
 	}
+}
+
+type RWMap[K comparable, V any] struct {
+	sync.RWMutex
+	m map[K]V
+}
+
+func NewRWMap[K comparable, V any]() *RWMap[K, V] {
+	return &RWMap[K, V]{
+		m: make(map[K]V),
+	}
+}
+
+func (m *RWMap[K, V]) Load(key K) (V, bool) {
+	m.RLock()
+	defer m.RUnlock()
+
+	v, existed := m.m[key]
+	return v, existed
+}
+
+func (m *RWMap[K, V]) LoadOrStore(key K, value V) (V, bool) {
+	m.Lock()
+	defer m.Unlock()
+
+	if v, existed := m.m[key]; existed {
+		return v, existed
+	}
+
+	m.m[key] = value
+	return value, false
+}
+
+func (m *RWMap[K, V]) Delete(key K) {
+	m.Lock()
+	delete(m.m, key)
+	m.Unlock()
 }

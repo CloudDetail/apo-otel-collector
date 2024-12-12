@@ -8,7 +8,7 @@ import (
 )
 
 type traceData struct {
-	lock        sync.Mutex
+	traceLock   sync.Mutex
 	traces      *ptrace.Traces
 	spanMapping *spanTraceMapping
 }
@@ -25,20 +25,12 @@ func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptra
 	newSpans := make([]*ptrace.Span, 0)
 	for _, span := range spans {
 		// 存在多个组件同时使用该Extension，避免数据重复插入
-		if _, found := data.spanMapping.spanIdMap.Load(span.SpanID()); !found {
+		if data.spanMapping.addSpanMapping(span) {
 			newSpans = append(newSpans, span)
 		}
 	}
 	if len(newSpans) == 0 {
 		return nil
-	}
-
-	for _, span := range newSpans {
-		// 记录Mapping映射关系
-		if span.Kind() == ptrace.SpanKindServer || span.Kind() == ptrace.SpanKindConsumer {
-			data.spanMapping.addEntrySpan(span.SpanID(), span.Name())
-		}
-		data.spanMapping.addParentSpanId(span.SpanID(), span.ParentSpanID())
 	}
 
 	if buildTrace {
@@ -53,7 +45,7 @@ func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptra
 			}
 			return &traces
 		} else {
-			data.lock.Lock()
+			data.traceLock.Lock()
 			rs := data.traces.ResourceSpans().AppendEmpty()
 			resource.CopyTo(rs.Resource())
 			ils := rs.ScopeSpans().AppendEmpty()
@@ -61,41 +53,62 @@ func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptra
 				sp := ils.Spans().AppendEmpty()
 				span.CopyTo(sp)
 			}
-			data.lock.Unlock()
+			data.traceLock.Unlock()
 		}
 	}
 	return nil
 }
 
 func (data *traceData) CleanCacheTrace() {
-	data.lock.Lock()
+	data.traceLock.Lock()
 	data.traces = nil
-	data.lock.Unlock()
+	data.traceLock.Unlock()
 }
 
 type spanTraceMapping struct {
-	spanIdMap        sync.Map // <spanId, pSpanId>
-	entrySpanNameMap sync.Map // <spanId, entryUrl>
+	lock             sync.RWMutex
+	spanIdMap        map[pcommon.SpanID]pcommon.SpanID // <spanId, pSpanId>
+	entrySpanNameMap map[pcommon.SpanID]string         // <spanId, entryUrl>
 }
 
 func newSpanTraceMapping() *spanTraceMapping {
-	return &spanTraceMapping{}
+	return &spanTraceMapping{
+		spanIdMap:        make(map[pcommon.SpanID]pcommon.SpanID),
+		entrySpanNameMap: make(map[pcommon.SpanID]string),
+	}
 }
 
-func (mapping *spanTraceMapping) addParentSpanId(spanId pcommon.SpanID, parentSpanId pcommon.SpanID) {
-	mapping.spanIdMap.Store(spanId, parentSpanId)
-}
+func (mapping *spanTraceMapping) addSpanMapping(span *ptrace.Span) bool {
+	mapping.lock.Lock()
+	defer mapping.lock.Unlock()
 
-func (mapping *spanTraceMapping) addEntrySpan(spanId pcommon.SpanID, spanName string) {
-	mapping.entrySpanNameMap.Store(spanId, spanName)
+	if _, ok := mapping.spanIdMap[span.SpanID()]; ok {
+		return false
+	}
+
+	mapping.spanIdMap[span.SpanID()] = span.ParentSpanID()
+	if span.Kind() == ptrace.SpanKindServer || span.Kind() == ptrace.SpanKindConsumer {
+		mapping.entrySpanNameMap[span.SpanID()] = span.Name()
+	}
+	return true
 }
 
 func (mapping *spanTraceMapping) GetEntrySpanName(spanId pcommon.SpanID) string {
-	if url, found := mapping.entrySpanNameMap.Load(spanId); found {
-		return url.(string)
+	mapping.lock.RLock()
+	defer mapping.lock.RUnlock()
+
+	if len(mapping.entrySpanNameMap) == 0 {
+		return ""
 	}
-	if parent, found := mapping.spanIdMap.Load(spanId); found {
-		return mapping.GetEntrySpanName(parent.(pcommon.SpanID))
+	return mapping.getEntrySpanName(spanId)
+}
+
+func (mapping *spanTraceMapping) getEntrySpanName(spanId pcommon.SpanID) string {
+	if entrySpanName, found := mapping.entrySpanNameMap[spanId]; found {
+		return entrySpanName
+	}
+	if parentSpanId, found := mapping.spanIdMap[spanId]; found {
+		return mapping.GetEntrySpanName(parentSpanId)
 	}
 	return ""
 }
