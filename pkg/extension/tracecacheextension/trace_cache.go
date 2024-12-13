@@ -75,7 +75,6 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 	if !tce.enable {
 		return result
 	}
-	hasSampler := tce.sampler != nil
 	resourceSpans := traces.ResourceSpans()
 	for i := 0; i < resourceSpans.Len(); i++ {
 		rss := resourceSpans.At(i)
@@ -92,10 +91,14 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 				// 新的Bucket记录TraceId
 				tce.idBatch.AddToBatch(id)
 			}
-			toSendTraces := traceData.CacheTraceSpans(&resource, spans, hasSampler)
-			if hasSampler && len(toSendTraces) > 0 {
-				// 针对超时场景 --- 超过sampleTime，后续到达的Trace数据，不再缓存SampleTime.
-				tce.sampler.Sample(id, toSendTraces)
+
+			// SpanId映射，避免重复插入
+			newSpans := traceData.CacheSpanMapping(spans)
+			if tce.sampler != nil && len(newSpans) > 0 {
+				if otelTrace, ok := traceData.CacheTraceSpans(tce.sampler.NewOtelTrace(&resource, newSpans)); !ok {
+					// 针对超时场景 --- 超过sampleTime，后续到达的Trace数据，不再缓存SampleTime.
+					tce.sampler.Sample(id, otelTrace)
+				}
 			}
 			result[id] = traceData.spanMapping
 		}
@@ -147,7 +150,7 @@ func (tce *TraceCacheExtension) cleanOnTick() {
 		for _, id := range sampleIdBatch {
 			if traceData, ok := tce.idToTrace.Load(id); ok {
 				// 释放Trace 内存数据
-				tce.sampler.Sample(id, traceData.GetAndCleanCacheTrace())
+				tce.sampler.BatchSample(id, traceData.GetAndCleanCacheTrace())
 			}
 		}
 		tce.cleanExpireTraces(expireIdBatch)

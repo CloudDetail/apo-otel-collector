@@ -21,31 +21,39 @@ type SpanMapping interface {
 type Sampler interface {
 	Name() string
 	GetSampleTime() int
-	Sample(id pcommon.TraceID, traces []*TraceData)
+
+	Sample(id pcommon.TraceID, trace *OtelTrace)
+	BatchSample(id pcommon.TraceID, traces []*OtelTrace)
+	NewOtelTrace(resource *pcommon.Resource, spans []*ptrace.Span) *OtelTrace
 }
 
-type TraceData struct {
+type OtelTrace struct {
 	Resource *pcommon.Resource
 	Spans    []*ptrace.Span
 }
 
-func NewTraceData(resource *pcommon.Resource, spans []*ptrace.Span) *TraceData {
-	return &TraceData{
-		Resource: resource,
-		Spans:    spans,
+func BuildTrace(trace *OtelTrace) ptrace.Traces {
+	result := ptrace.NewTraces()
+	rs := result.ResourceSpans().AppendEmpty()
+	trace.Resource.CopyTo(rs.Resource())
+	ils := rs.ScopeSpans().AppendEmpty()
+	for _, span := range trace.Spans {
+		sp := ils.Spans().AppendEmpty()
+		span.CopyTo(sp)
 	}
+	return result
 }
 
-func BuildTraces(traceDatas []*TraceData) ptrace.Traces {
-	traces := ptrace.NewTraces()
-	for _, traceData := range traceDatas {
-		rs := traces.ResourceSpans().AppendEmpty()
-		traceData.Resource.CopyTo(rs.Resource())
+func BuildTraces(traces []*OtelTrace) ptrace.Traces {
+	result := ptrace.NewTraces()
+	for _, trace := range traces {
+		rs := result.ResourceSpans().AppendEmpty()
+		trace.Resource.CopyTo(rs.Resource())
 		ils := rs.ScopeSpans().AppendEmpty()
-		for _, span := range traceData.Spans {
+		for _, span := range trace.Spans {
 			sp := ils.Spans().AppendEmpty()
 			span.CopyTo(sp)
 		}
 	}
-	return traces
+	return result
 }

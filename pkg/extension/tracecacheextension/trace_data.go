@@ -10,18 +10,18 @@ import (
 
 type traceData struct {
 	traceLock   sync.Mutex
-	traces      []*tracecache.TraceData
+	traces      []*tracecache.OtelTrace
 	spanMapping *spanTraceMapping
 }
 
 func newTraceData() *traceData {
 	return &traceData{
-		traces:      make([]*tracecache.TraceData, 0),
+		traces:      make([]*tracecache.OtelTrace, 0),
 		spanMapping: newSpanTraceMapping(),
 	}
 }
 
-func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptrace.Span, buildTrace bool) []*tracecache.TraceData {
+func (data *traceData) CacheSpanMapping(spans []*ptrace.Span) []*ptrace.Span {
 	newSpans := make([]*ptrace.Span, 0)
 	for _, span := range spans {
 		// 存在多个组件同时使用该Extension，避免数据重复插入
@@ -29,23 +29,21 @@ func (data *traceData) CacheTraceSpans(resource *pcommon.Resource, spans []*ptra
 			newSpans = append(newSpans, span)
 		}
 	}
-	if len(newSpans) == 0 {
-		return nil
-	}
-
-	if buildTrace {
-		if data.traces == nil {
-			return []*tracecache.TraceData{tracecache.NewTraceData(resource, newSpans)}
-		} else {
-			data.traceLock.Lock()
-			data.traces = append(data.traces, tracecache.NewTraceData(resource, newSpans))
-			data.traceLock.Unlock()
-		}
-	}
-	return nil
+	return newSpans
 }
 
-func (data *traceData) GetAndCleanCacheTrace() []*tracecache.TraceData {
+func (data *traceData) CacheTraceSpans(otelTrace *tracecache.OtelTrace) (*tracecache.OtelTrace, bool) {
+	if data.traces == nil {
+		return otelTrace, false
+	}
+
+	data.traceLock.Lock()
+	defer data.traceLock.Unlock()
+	data.traces = append(data.traces, otelTrace)
+	return nil, true
+}
+
+func (data *traceData) GetAndCleanCacheTrace() []*tracecache.OtelTrace {
 	data.traceLock.Lock()
 	defer data.traceLock.Unlock()
 
