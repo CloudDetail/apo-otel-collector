@@ -100,12 +100,12 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 			// SpanId映射，避免重复插入
 			newSpans := traceData.CacheSpanMapping(spans)
 			if tce.sampler != nil && len(newSpans) > 0 {
-				if otelTrace, ok := traceData.CacheTraceSpans(tracecache.NewOtelTrace(&resource, newSpans)); !ok {
+				if otelTrace, ok := traceData.CacheTrace(tracecache.NewOtelTrace(&resource, newSpans)); !ok {
 					// 针对超时场景 --- 超过sampleTime，后续到达的Trace数据，不再缓存SampleTime.
 					tce.sampler.Sample(id, otelTrace)
 				}
 			}
-			result[id] = traceData.spanMapping
+			result[id] = traceData
 		}
 	}
 	return result
