@@ -28,6 +28,7 @@ type TraceCacheExtension struct {
 	tickerFrequency  time.Duration
 	activeTraceCount *atomic.Int64
 	sampler          tracecache.Sampler
+	connector        tracecache.Connector
 }
 
 func newTraceCacheExtension(settings extension.Settings, cfg *Config) (*TraceCacheExtension, error) {
@@ -52,6 +53,10 @@ func newTraceCacheExtension(settings extension.Settings, cfg *Config) (*TraceCac
 
 func (tce *TraceCacheExtension) IsEnable() bool {
 	return tce.enable
+}
+
+func (tce *TraceCacheExtension) HasConnector() bool {
+	return tce.connector != nil
 }
 
 func (tce *TraceCacheExtension) Start(context.Context, component.Host) error {
@@ -95,7 +100,7 @@ func (tce *TraceCacheExtension) CacheTrace(traces ptrace.Traces) map[pcommon.Tra
 			// SpanId映射，避免重复插入
 			newSpans := traceData.CacheSpanMapping(spans)
 			if tce.sampler != nil && len(newSpans) > 0 {
-				if otelTrace, ok := traceData.CacheTraceSpans(tce.sampler.NewOtelTrace(&resource, newSpans)); !ok {
+				if otelTrace, ok := traceData.CacheTraceSpans(tracecache.NewOtelTrace(&resource, newSpans)); !ok {
 					// 针对超时场景 --- 超过sampleTime，后续到达的Trace数据，不再缓存SampleTime.
 					tce.sampler.Sample(id, otelTrace)
 				}
@@ -137,6 +142,16 @@ func (tce *TraceCacheExtension) SetSampler(sampler tracecache.Sampler) error {
 			zap.String("name[2]", sampler.Name()))
 	}
 	return nil
+}
+
+func (tce *TraceCacheExtension) SetConnector(connector tracecache.Connector) {
+	if tce.connector == nil {
+		tce.connector = connector
+	} else {
+		tce.logger.Warn("more than one connector for traceCache",
+			zap.String("name[1]", tce.connector.Name()),
+			zap.String("name[2]", connector.Name()))
+	}
 }
 
 func (tce *TraceCacheExtension) cleanOnTick() {

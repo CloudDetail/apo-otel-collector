@@ -165,6 +165,10 @@ func (p *connectorImp) setTraceCache(host component.Host) bool {
 	return false
 }
 
+func (p *connectorImp) Name() string {
+	return "RedMetricConnector"
+}
+
 func mapDurationsToNanos(vs []time.Duration) []float64 {
 	vsm := make([]float64, len(vs))
 	for i, v := range vs {
@@ -183,6 +187,7 @@ func (p *connectorImp) Start(ctx context.Context, host component.Host) error {
 		p.logger.Info("Enable Add EntryUrl to Red Metric")
 		p.cleanUnMatcheTicker = &timeutils.PolicyTicker{OnTickFunc: p.cleanUnMatcheOnTick}
 		p.cleanUnMatcheTicker.Start(time.Second)
+		p.traceCache.SetConnector(p)
 	} else {
 		p.logger.Info("Disable Add EntryUrl to Red Metric")
 	}

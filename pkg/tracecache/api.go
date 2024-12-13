@@ -12,6 +12,14 @@ type TraceCache interface {
 
 	// 设置采样器
 	SetSampler(sampler Sampler) error
+
+	SetConnector(connector Connector)
+
+	HasConnector() bool
+}
+
+type Connector interface {
+	Name() string
 }
 
 type SpanMapping interface {
@@ -24,12 +32,18 @@ type Sampler interface {
 
 	Sample(id pcommon.TraceID, trace *OtelTrace)
 	BatchSample(id pcommon.TraceID, traces []*OtelTrace)
-	NewOtelTrace(resource *pcommon.Resource, spans []*ptrace.Span) *OtelTrace
 }
 
 type OtelTrace struct {
 	Resource *pcommon.Resource
 	Spans    []*ptrace.Span
+}
+
+func NewOtelTrace(resource *pcommon.Resource, spans []*ptrace.Span) *OtelTrace {
+	return &OtelTrace{
+		Resource: resource,
+		Spans:    spans,
+	}
 }
 
 func BuildTrace(trace *OtelTrace) ptrace.Traces {
