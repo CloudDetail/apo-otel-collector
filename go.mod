@@ -57,7 +57,7 @@ require (
 	github.com/CloudDetail/apo-otel-collector/pkg/common v0.0.0-00000000000000-000000000000 // indirect
 	github.com/CloudDetail/apo-otel-collector/pkg/fillproc v0.0.0-00000000000000-000000000000 // indirect
 	github.com/CloudDetail/apo-otel-collector/pkg/sqlprune v0.0.0-00000000000000-000000000000 // indirect
-	github.com/CloudDetail/metadata v0.0.0-20240903055919-f0487c96aa95 // indirect
+	github.com/CloudDetail/metadata v0.0.0-20241129101557-10d59745e7b7 // indirect
 	github.com/Code-Hex/go-generics-cache v1.3.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/alecthomas/participle/v2 v2.1.1 // indirect

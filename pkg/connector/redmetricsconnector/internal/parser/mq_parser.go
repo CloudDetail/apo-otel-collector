@@ -22,7 +22,7 @@ func NewMqParser() *MqParser {
 	return &MqParser{}
 }
 
-func (parser *MqParser) Parse(logger *zap.Logger, pid string, containerId string, serviceName string, span ptrace.Span, spanAttr pcommon.Map, keyValue *cache.ReusedKeyValue) string {
+func (parser *MqParser) Parse(logger *zap.Logger, pid string, containerId string, serviceName string, entryUrl string, span *ptrace.Span, spanAttr pcommon.Map, keyValue *cache.ReusedKeyValue) string {
 	if span.Kind() != ptrace.SpanKindClient && span.Kind() != ptrace.SpanKindProducer && span.Kind() != ptrace.SpanKindConsumer {
 		return ""
 	}
@@ -47,7 +47,7 @@ func (parser *MqParser) Parse(logger *zap.Logger, pid string, containerId string
 		name = getMessageDest(spanAttr, Unknown)
 	}
 
-	return buildMqKey(keyValue, pid, containerId, serviceName,
+	return buildMqKey(keyValue, pid, containerId, serviceName, entryUrl,
 		name,                    // Topic
 		GetClientPeer(spanAttr), // ip:port
 		mqSystem,                // mqSystem, eg. rabbitmq、kafka

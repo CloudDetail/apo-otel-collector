@@ -3,13 +3,11 @@ package redmetricsconnector
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector/internal/cache"
 	"github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector/internal/parser"
-	"github.com/CloudDetail/apo-otel-collector/pkg/fillproc"
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -72,6 +70,8 @@ type connectorImp struct {
 	maxNumberOfServicesToTrack             int
 	maxNumberOfOperationsToTrackPerService int
 	metricsType                            cache.MetricsType
+
+	entryUrlCache *cache.EntryUrlCache
 }
 
 var (
@@ -117,7 +117,7 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		bounds = mapDurationsToNanos(pConfig.LatencyHistogramBuckets)
 	}
 
-	return &connectorImp{
+	connector := &connectorImp{
 		logger:                                 logger,
 		config:                                 *pConfig,
 		startTimestamp:                         pcommon.NewTimestampFromTime(time.Now()),
@@ -141,7 +141,11 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		maxNumberOfServicesToTrack:             pConfig.MaxServicesToTrack,
 		maxNumberOfOperationsToTrackPerService: pConfig.MaxOperationsToTrackPerService,
 		metricsType:                            cache.GetMetricsType(pConfig.MetricsType),
-	}, nil
+	}
+	if pConfig.ClientEntryUrlEnabled {
+		connector.entryUrlCache = cache.NewEntryUrlCache(int64(pConfig.UnMatchUrlExpireTime.Seconds()))
+	}
+	return connector, nil
 }
 
 func mapDurationsToNanos(vs []time.Duration) []float64 {
@@ -154,9 +158,13 @@ func mapDurationsToNanos(vs []time.Duration) []float64 {
 
 // Start implements the component.Component interface.
 func (p *connectorImp) Start(ctx context.Context, _ component.Host) error {
-	if !p.config.DbEnabled && !p.config.ServerEnabled {
+	if !p.config.ServerEnabled && !p.config.ExternalEnabled && !p.config.DbEnabled && !p.config.MqEnabled {
 		p.logger.Warn("[Warning] Disable redmetrics connector")
 		return nil
+	}
+
+	if p.config.ClientEntryUrlEnabled {
+		p.entryUrlCache.Start()
 	}
 
 	p.started = true
@@ -196,9 +204,45 @@ func (p *connectorImp) Capabilities() consumer.Capabilities {
 // ConsumeTraces implements the consumer.Traces interface.
 // It aggregates the trace data to generate metrics.
 func (p *connectorImp) ConsumeTraces(_ context.Context, traces ptrace.Traces) error {
-	p.lock.Lock()
-	p.aggregateMetrics(traces)
-	p.lock.Unlock()
+	resourceSpans := traces.ResourceSpans()
+
+	if p.entryUrlCache != nil {
+		resourceSpans := p.entryUrlCache.GetMatchedResourceSpans(traces)
+		for _, resresourceSpan := range resourceSpans {
+			p.lock.Lock()
+			p.aggregateMetricsForSpan(
+				resresourceSpan.Pid,
+				resresourceSpan.ContainerId,
+				resresourceSpan.ServiceName,
+				resresourceSpan.EntryUrl,
+				resresourceSpan.Span,
+			)
+			p.lock.Unlock()
+		}
+	} else {
+		for i := 0; i < resourceSpans.Len(); i++ {
+			rss := resourceSpans.At(i)
+
+			pid, serviceName, containerId := cache.GetResourceAttribute(rss)
+			if pid == "" || serviceName == "" {
+				// 必须存在PID 和 服务名
+				continue
+			}
+			ilsSlice := rss.ScopeSpans()
+			for j := 0; j < ilsSlice.Len(); j++ {
+				ils := ilsSlice.At(j)
+				spans := ils.Spans()
+				for k := 0; k < spans.Len(); k++ {
+					span := spans.At(k)
+
+					p.lock.Lock()
+					p.aggregateMetricsForSpan(pid, containerId, serviceName, "", &span)
+					p.lock.Unlock()
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -368,44 +412,7 @@ func collectVmLatencyMetrics(ilm pmetric.ScopeMetrics,
 	return nil
 }
 
-// aggregateMetrics aggregates the raw metrics from the input trace data.
-// Each metric is identified by a key that is built from the service name
-// and span metadata such as operation, kind, status_code and any additional
-// dimensions the user has configured.
-func (p *connectorImp) aggregateMetrics(traces ptrace.Traces) {
-	for i := 0; i < traces.ResourceSpans().Len(); i++ {
-		rspans := traces.ResourceSpans().At(i)
-		resourceAttr := rspans.Resource().Attributes()
-		pidIntValue := fillproc.GetPid(resourceAttr)
-		if pidIntValue <= 0 {
-			// 必须存在PID
-			continue
-		}
-
-		serviceAttr, ok := resourceAttr.Get(conventions.AttributeServiceName)
-		if !ok {
-			// 必须存在服务名
-			continue
-		}
-		pid := strconv.FormatInt(pidIntValue, 10)
-		containerId := fillproc.GetContainerId(resourceAttr)
-		if len(containerId) > 12 {
-			containerId = containerId[:12]
-		}
-		serviceName := serviceAttr.Str()
-		ilsSlice := rspans.ScopeSpans()
-		for j := 0; j < ilsSlice.Len(); j++ {
-			ils := ilsSlice.At(j)
-			spans := ils.Spans()
-			for k := 0; k < spans.Len(); k++ {
-				span := spans.At(k)
-				p.aggregateMetricsForSpan(pid, containerId, serviceName, span)
-			}
-		}
-	}
-}
-
-func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, serviceName string, span ptrace.Span) {
+func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, serviceName string, entryUrl string, span *ptrace.Span) {
 	// Protect against end timestamps before start timestamps. Assume 0 duration.
 	startTime := span.StartTimestamp()
 	endTime := span.EndTimestamp()
@@ -429,7 +436,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 	spanAttr := span.Attributes()
 	if span.Kind() == ptrace.SpanKindClient {
 		if p.config.DbEnabled {
-			if dbKey := p.dbParser.Parse(p.logger, pid, containerId, serviceName, span, spanAttr, p.keyValue); dbKey != "" {
+			if dbKey := p.dbParser.Parse(p.logger, pid, containerId, serviceName, entryUrl, span, spanAttr, p.keyValue); dbKey != "" {
 				dbCallKey := metricKey(dbKey)
 				if _, has := p.dbCallMetricKeyToDimensions.Get(dbCallKey); !has {
 					p.dbCallMetricKeyToDimensions.Add(dbCallKey, p.keyValue.GetMap())
@@ -440,16 +447,16 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 
 		if p.config.ExternalEnabled {
 			var externalKey string
-			if httpKey := p.httpParser.Parse(p.logger, pid, containerId, serviceName, span, spanAttr, p.keyValue); httpKey != "" {
+			if httpKey := p.httpParser.Parse(p.logger, pid, containerId, serviceName, entryUrl, span, spanAttr, p.keyValue); httpKey != "" {
 				externalKey = httpKey
-			} else if rpcKey := p.rpcParser.Parse(p.logger, pid, containerId, serviceName, span, spanAttr, p.keyValue); rpcKey != "" {
+			} else if rpcKey := p.rpcParser.Parse(p.logger, pid, containerId, serviceName, entryUrl, span, spanAttr, p.keyValue); rpcKey != "" {
 				externalKey = rpcKey
 			} else {
 				_, dbSystemExist := spanAttr.Get(conventions.AttributeDBSystem)
 				_, mqSystemExist := spanAttr.Get(conventions.AttributeMessagingSystem)
 				if !dbSystemExist && !mqSystemExist {
 					// 过滤DB 和 Mq
-					externalKey = parser.BuildExternalKey(p.keyValue, pid, containerId, serviceName,
+					externalKey = parser.BuildExternalKey(p.keyValue, pid, containerId, serviceName, entryUrl,
 						span.Name(),
 						parser.GetClientPeer(spanAttr),
 						"unknown",
@@ -468,7 +475,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 	}
 
 	if p.config.MqEnabled {
-		if mqKey := p.mqParser.Parse(p.logger, pid, containerId, serviceName, span, spanAttr, p.keyValue); mqKey != "" {
+		if mqKey := p.mqParser.Parse(p.logger, pid, containerId, serviceName, entryUrl, span, spanAttr, p.keyValue); mqKey != "" {
 			mqCallKey := metricKey(mqKey)
 			if _, has := p.mqCallMetricKeyToDimensions.Get(mqCallKey); !has {
 				p.mqCallMetricKeyToDimensions.Add(mqCallKey, p.keyValue.GetMap())
@@ -479,7 +486,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 }
 
 // buildKey Server Red指标
-func (p *connectorImp) buildServerKey(pid string, containerId string, serviceName string, span ptrace.Span) string {
+func (p *connectorImp) buildServerKey(pid string, containerId string, serviceName string, span *ptrace.Span) string {
 	spanName := span.Name()
 	if len(p.serviceToOperations) > p.maxNumberOfServicesToTrack {
 		p.logger.Warn("Too many services to track, using overflow service name", zap.Int("maxNumberOfServicesToTrack", p.maxNumberOfServicesToTrack))

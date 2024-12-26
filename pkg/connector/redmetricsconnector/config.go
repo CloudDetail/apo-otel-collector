@@ -11,6 +11,10 @@ type Config struct {
 	DbEnabled bool `mapstructure:"db_enabled"`
 	// 是否采集MQ调用RED指标
 	MqEnabled bool `mapstructure:"mq_enabled"`
+	// 是否采样中间件入口URL
+	ClientEntryUrlEnabled bool `mapstructure:"client_entry_url_enabled"`
+	// 未匹配的ExitSpan缓存时间
+	UnMatchUrlExpireTime time.Duration `mapstructure:"unmatch_url_expire_time"`
 	// RED Key缓存的数量，超过则清理，避免内存泄漏。此外也用于清理已失效PID数据.
 	DimensionsCacheSize int `mapstructure:"dimensions_cache_size"`
 	// 指标采集周期（秒），默认60

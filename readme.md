@@ -84,6 +84,10 @@ connectors:
     external_enabled: true
     # 开启MQ RED指标生成
     mq_enabled: true
+    # 开启对外调用添加入口URL
+    client_entry_url_enabled: false
+    # 未匹配的ExitSpan缓存时间
+    unmatch_url_expire_time: 60s
     # RED Key缓存的数量，超过则清理；用于清理已失效PID数据.
     dimensions_cache_size: 1000
     # 指标发送间隔
