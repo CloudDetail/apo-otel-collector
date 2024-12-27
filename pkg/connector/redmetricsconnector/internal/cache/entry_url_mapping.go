@@ -22,6 +22,7 @@ type EntryUrlCache struct {
 
 func NewEntryUrlCache(expireTime int64) *EntryUrlCache {
 	cache := &EntryUrlCache{
+		entryUrlMap:        make(map[pcommon.TraceID]*entryUrlMapping),
 		unMatchedSpans:     make([]*ResourceSpan, 0),
 		expireUnMatcheTime: expireTime,
 	}
