@@ -13,6 +13,8 @@ type Config struct {
 	MqEnabled bool `mapstructure:"mq_enabled"`
 	// 是否采样中间件入口URL
 	ClientEntryUrlEnabled bool `mapstructure:"client_entry_url_enabled"`
+	// 缓存EntryUrl的时间
+	CacheEntryUrlTime time.Duration `mapstructure:"cache_entry_url_time"`
 	// 未匹配的ExitSpan缓存时间
 	UnMatchUrlExpireTime time.Duration `mapstructure:"unmatch_url_expire_time"`
 	// RED Key缓存的数量，超过则清理，避免内存泄漏。此外也用于清理已失效PID数据.

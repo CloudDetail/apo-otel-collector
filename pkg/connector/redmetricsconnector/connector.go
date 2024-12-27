@@ -145,7 +145,14 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		metricsType:                            cache.GetMetricsType(pConfig.MetricsType),
 	}
 	if pConfig.ClientEntryUrlEnabled {
-		connector.entryUrlCache = cache.NewEntryUrlCache(int64(pConfig.UnMatchUrlExpireTime.Seconds()))
+		entryUrlCache, err := cache.NewEntryUrlCache(
+			int(pConfig.CacheEntryUrlTime.Seconds()),
+			int64(pConfig.UnMatchUrlExpireTime.Seconds()),
+		)
+		if err != nil {
+			return nil, err
+		}
+		connector.entryUrlCache = entryUrlCache
 		connector.cleanUnMatcheTicker = &timeutils.PolicyTicker{OnTickFunc: connector.cleanUnMatcheOnTick}
 	}
 	return connector, nil
@@ -209,6 +216,7 @@ func (p *connectorImp) Capabilities() consumer.Capabilities {
 }
 
 func (p *connectorImp) cleanUnMatcheOnTick() {
+	p.entryUrlCache.CleanExpireBuckets()
 	if resourceSpans := p.entryUrlCache.CleanUnMatchedSpans(); len(resourceSpans) > 0 {
 		for _, resourceSpan := range resourceSpans {
 			p.lock.Lock()

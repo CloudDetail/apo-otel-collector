@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -12,18 +13,35 @@ import (
 )
 
 type EntryUrlCache struct {
-	lock               sync.Mutex
-	entryUrlMap        map[pcommon.TraceID]*entryUrlMapping
-	unMatchedSpans     []*ResourceSpan
+	lock           sync.Mutex
+	entryUrlMap    map[pcommon.TraceID]*entryUrlMapping
+	unMatchedSpans []*ResourceSpan
+
+	idBatch            *WriteableBatch
+	idBuckets          *Buckets
 	expireUnMatcheTime int64
 }
 
-func NewEntryUrlCache(expireTime int64) *EntryUrlCache {
+func NewEntryUrlCache(cacheUrlTime int, expireTime int64) (*EntryUrlCache, error) {
+	if cacheUrlTime < 0 {
+		return nil, fmt.Errorf(
+			"invalid cache_entry_url_time: %v, the number must be positive",
+			cacheUrlTime,
+		)
+	}
+	if expireTime < 0 {
+		return nil, fmt.Errorf(
+			"invalid unmatch_url_expire_time: %v, the number must be positive",
+			expireTime,
+		)
+	}
 	return &EntryUrlCache{
 		entryUrlMap:        make(map[pcommon.TraceID]*entryUrlMapping),
 		unMatchedSpans:     make([]*ResourceSpan, 0),
+		idBatch:            NewWriteableBatch(),
+		idBuckets:          NewBuckets(cacheUrlTime),
 		expireUnMatcheTime: expireTime,
-	}
+	}, nil
 }
 
 func (cache *EntryUrlCache) GetMatchedResourceSpans(traces ptrace.Traces) []*ResourceSpan {
@@ -40,6 +58,8 @@ func (cache *EntryUrlCache) GetMatchedResourceSpans(traces ptrace.Traces) []*Res
 			if !ok {
 				mapping = newEntryUrlMapping()
 				cache.entryUrlMap[id] = mapping
+				// Record TraceId
+				cache.idBatch.AddToBatch(id)
 			}
 			mapping.AddMapping(spans)
 			cachedTraces[id] = mapping
@@ -98,6 +118,17 @@ func (cache *EntryUrlCache) GetMatchedResourceSpans(traces ptrace.Traces) []*Res
 		}
 	}
 	return result
+}
+
+func (cache *EntryUrlCache) CleanExpireBuckets() {
+	toCleanIds := cache.idBuckets.CopyAndGetBatch(cache.idBatch.PickBatch())
+	if len(toCleanIds) > 0 {
+		cache.lock.Lock()
+		for _, toCleanId := range toCleanIds {
+			delete(cache.entryUrlMap, toCleanId)
+		}
+		cache.lock.Unlock()
+	}
 }
 
 func (cache *EntryUrlCache) CleanUnMatchedSpans() []*ResourceSpan {

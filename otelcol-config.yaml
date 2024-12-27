@@ -47,6 +47,8 @@ connectors:
     mq_enabled: true
     # 开启对外调用添加入口URL
     client_entry_url_enabled: false
+    # 缓存EntryUrl的时间
+    cache_entry_url_time: 30s
     # 未匹配的ExitSpan缓存时间
     unmatch_url_expire_time: 60s
     # RED Key缓存的数量，超过则清理；用于清理已失效PID数据.
