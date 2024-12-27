@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CloudDetail/apo-otel-collector/pkg/common/timeutils"
 	"github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector/internal/cache"
 	"github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector/internal/parser"
 	"github.com/tilinna/clock"
@@ -71,7 +72,8 @@ type connectorImp struct {
 	maxNumberOfOperationsToTrackPerService int
 	metricsType                            cache.MetricsType
 
-	entryUrlCache *cache.EntryUrlCache
+	entryUrlCache       *cache.EntryUrlCache
+	cleanUnMatcheTicker timeutils.TTicker
 }
 
 var (
@@ -144,6 +146,7 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 	}
 	if pConfig.ClientEntryUrlEnabled {
 		connector.entryUrlCache = cache.NewEntryUrlCache(int64(pConfig.UnMatchUrlExpireTime.Seconds()))
+		connector.cleanUnMatcheTicker = &timeutils.PolicyTicker{OnTickFunc: connector.cleanUnMatcheOnTick}
 	}
 	return connector, nil
 }
@@ -164,7 +167,7 @@ func (p *connectorImp) Start(ctx context.Context, _ component.Host) error {
 	}
 
 	if p.config.ClientEntryUrlEnabled {
-		p.entryUrlCache.Start()
+		p.cleanUnMatcheTicker.Start(time.Second)
 	}
 
 	p.started = true
@@ -184,6 +187,10 @@ func (p *connectorImp) Start(ctx context.Context, _ component.Host) error {
 
 // Shutdown implements the component.Component interface.
 func (p *connectorImp) Shutdown(context.Context) error {
+	if p.config.ClientEntryUrlEnabled {
+		p.cleanUnMatcheTicker.Stop()
+	}
+
 	p.shutdownOnce.Do(func() {
 		p.logger.Info("Shutting down redmetrics connector")
 		if p.started {
@@ -201,6 +208,23 @@ func (p *connectorImp) Capabilities() consumer.Capabilities {
 	return consumer.Capabilities{MutatesData: false}
 }
 
+func (p *connectorImp) cleanUnMatcheOnTick() {
+	if resourceSpans := p.entryUrlCache.CleanUnMatchedSpans(); len(resourceSpans) > 0 {
+		for _, resourceSpan := range resourceSpans {
+			p.lock.Lock()
+			// Send NotMatch ExitSpan With EntrySpan metric.
+			p.aggregateMetricsForSpan(
+				resourceSpan.Pid,
+				resourceSpan.ContainerId,
+				resourceSpan.ServiceName,
+				"_unknown_",
+				resourceSpan.Span,
+			)
+			p.lock.Unlock()
+		}
+	}
+}
+
 // ConsumeTraces implements the consumer.Traces interface.
 // It aggregates the trace data to generate metrics.
 func (p *connectorImp) ConsumeTraces(_ context.Context, traces ptrace.Traces) error {
@@ -208,14 +232,14 @@ func (p *connectorImp) ConsumeTraces(_ context.Context, traces ptrace.Traces) er
 
 	if p.entryUrlCache != nil {
 		resourceSpans := p.entryUrlCache.GetMatchedResourceSpans(traces)
-		for _, resresourceSpan := range resourceSpans {
+		for _, resourceSpan := range resourceSpans {
 			p.lock.Lock()
 			p.aggregateMetricsForSpan(
-				resresourceSpan.Pid,
-				resresourceSpan.ContainerId,
-				resresourceSpan.ServiceName,
-				resresourceSpan.EntryUrl,
-				resresourceSpan.Span,
+				resourceSpan.Pid,
+				resourceSpan.ContainerId,
+				resourceSpan.ServiceName,
+				resourceSpan.EntryUrl,
+				resourceSpan.Span,
 			)
 			p.lock.Unlock()
 		}

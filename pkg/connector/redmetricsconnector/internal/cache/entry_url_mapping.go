@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CloudDetail/apo-otel-collector/pkg/common/timeutils"
 	"github.com/CloudDetail/apo-otel-collector/pkg/fillproc"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -13,26 +12,18 @@ import (
 )
 
 type EntryUrlCache struct {
-	lock                sync.Mutex
-	entryUrlMap         map[pcommon.TraceID]*entryUrlMapping
-	unMatchedSpans      []*ResourceSpan
-	expireUnMatcheTime  int64
-	cleanUnMatcheTicker timeutils.TTicker
+	lock               sync.Mutex
+	entryUrlMap        map[pcommon.TraceID]*entryUrlMapping
+	unMatchedSpans     []*ResourceSpan
+	expireUnMatcheTime int64
 }
 
 func NewEntryUrlCache(expireTime int64) *EntryUrlCache {
-	cache := &EntryUrlCache{
+	return &EntryUrlCache{
 		entryUrlMap:        make(map[pcommon.TraceID]*entryUrlMapping),
 		unMatchedSpans:     make([]*ResourceSpan, 0),
 		expireUnMatcheTime: expireTime,
 	}
-	cache.cleanUnMatcheTicker = &timeutils.PolicyTicker{OnTickFunc: cache.cleanUnMatcheOnTick}
-
-	return cache
-}
-
-func (cache *EntryUrlCache) Start() {
-	cache.cleanUnMatcheTicker.Start(time.Second)
 }
 
 func (cache *EntryUrlCache) GetMatchedResourceSpans(traces ptrace.Traces) []*ResourceSpan {
@@ -89,14 +80,15 @@ func (cache *EntryUrlCache) GetMatchedResourceSpans(traces ptrace.Traces) []*Res
 					if mapping, ok := cache.entryUrlMap[span.TraceID()]; ok {
 						parentSpanId := span.ParentSpanID()
 						if parentSpanId.IsEmpty() {
-							// Ignore ExitSpan as root span data.
-							continue
-						}
-						entryUrl := mapping.GetEntrySpanName(parentSpanId)
-						if entryUrl == "" {
-							cache.unMatchedSpans = append(cache.unMatchedSpans, NewResourceSpan(expireTime, pid, containerId, serviceName, "", &span))
+							// ExitSpan as root span data.
+							result = append(result, NewResourceSpan(expireTime, pid, containerId, serviceName, span.Name(), &span))
 						} else {
-							result = append(result, NewResourceSpan(expireTime, pid, containerId, serviceName, entryUrl, &span))
+							entryUrl := mapping.GetEntrySpanName(parentSpanId)
+							if entryUrl == "" {
+								cache.unMatchedSpans = append(cache.unMatchedSpans, NewResourceSpan(expireTime, pid, containerId, serviceName, "", &span))
+							} else {
+								result = append(result, NewResourceSpan(expireTime, pid, containerId, serviceName, entryUrl, &span))
+							}
 						}
 					}
 				} else if span.Kind() == ptrace.SpanKindConsumer || span.Kind() == ptrace.SpanKindServer {
@@ -108,22 +100,32 @@ func (cache *EntryUrlCache) GetMatchedResourceSpans(traces ptrace.Traces) []*Res
 	return result
 }
 
-func (cache *EntryUrlCache) cleanUnMatcheOnTick() {
+func (cache *EntryUrlCache) CleanUnMatchedSpans() []*ResourceSpan {
 	if len(cache.unMatchedSpans) == 0 {
-		return
+		return nil
 	}
 
 	now := time.Now().Unix()
-	cache.lock.Lock()
-	for index := 0; index < len(cache.unMatchedSpans); index++ {
-		unMatchedSpan := cache.unMatchedSpans[index]
-		if unMatchedSpan.ExpireTime < now {
-			// 清理超时数据
-			cache.unMatchedSpans = append(cache.unMatchedSpans[:index], cache.unMatchedSpans[index+1:]...)
-			index--
+	expireIndex := 0
+	size := len(cache.unMatchedSpans)
+	for index := 0; index < size; index++ {
+		if cache.unMatchedSpans[index].ExpireTime < now {
+			expireIndex++
+		} else {
+			break
 		}
 	}
+
+	if expireIndex == 0 {
+		return nil
+	}
+	unknownSpans := cache.unMatchedSpans[0:expireIndex]
+
+	cache.lock.Lock()
+	cache.unMatchedSpans = cache.unMatchedSpans[expireIndex:]
 	cache.lock.Unlock()
+
+	return unknownSpans
 }
 
 type entryUrlMapping struct {
