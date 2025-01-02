@@ -175,9 +175,8 @@ func (mapping *entryUrlMapping) AddMapping(spans []*ptrace.Span) {
 	for _, span := range spans {
 		if span.Kind() == ptrace.SpanKindServer || span.Kind() == ptrace.SpanKindConsumer {
 			mapping.entrySpanNames[span.SpanID()] = span.Name()
-		}
-		// ExitSpan is not necessary to store parent relation, as it will check with it's parentSpanId.
-		if span.Kind() != ptrace.SpanKindClient && span.Kind() == ptrace.SpanKindProducer {
+		} else if span.Kind() != ptrace.SpanKindClient && span.Kind() != ptrace.SpanKindProducer {
+			// ExitSpan is not necessary to store parent relation, as it will check with it's parentSpanId.
 			mapping.pspanIds[span.SpanID()] = span.ParentSpanID()
 		}
 	}
