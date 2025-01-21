@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+option go_package = ".;model";
+
+package kindling;
+
+// The Grpc service definition.
+service SlowThresholdService {
+    rpc QuerySlowThreshold (SlowThresholdRequest) returns (SlowThresholdResponse) {}
+}
+
+message SlowThresholdRequest {
+    string ip = 1;
+}
+
+message SlowThresholdResponse {
+    repeated SlowThresholdData datas = 1;
+    repeated ExceptionSwitchData exceptions = 2;
+}
+
+message SlowThresholdData {
+    string url = 1;
+    string containerId = 2;
+    double value = 3;
+    string type = 4;
+    string range = 5;
+    string serviceName = 6;
+    double multiple = 7;
+}
+
+message ExceptionSwitchData {
+    string serviceName = 1;
+    string url = 2;
+    bool markError = 3;
+}

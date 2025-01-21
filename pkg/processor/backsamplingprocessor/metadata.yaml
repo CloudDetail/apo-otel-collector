@@ -1,0 +1,28 @@
+type: backsampling
+
+status:
+  class: processor
+  stability:
+    beta: [traces]
+  distributions: [contrib]
+  codeowners:
+    active: [hocktea]
+
+tests:
+  config:
+
+telemetry:
+  metrics:
+    processor_back_sampling_span_count:
+      enabled: true
+      unit: "{spans}"
+      description: Number of spans that were sampled due to sample decision hit.
+      sum:
+        value_type: int
+        monotonic: true
+    processor_back_sampling_sample_value:
+      enabled: true
+      unit: "1"
+      description: Sample Value of the spans.
+      gauge:
+        value_type: int

@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option go_package = ".;model";
+
+package kindling;
+
+service SampleService {
+    rpc GetSampleValue(SampleMetric) returns (SampleResult);
+}
+
+message SampleMetric {
+    int64 queryTime = 1;
+    string nodeIp = 2;
+    int64 cacheSecond = 3;
+    uint64 memory = 4;
+    uint64 memoryLimit = 5;
+}
+
+message SampleResult {
+    int64 value = 1;
+}

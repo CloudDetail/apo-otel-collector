@@ -22,6 +22,7 @@ receivers:
 processors:
 - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.103.0
 - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.103.0
+- gomod: github.com/CloudDetail/apo-otel-collector/pkg/processor/backsamplingprocessor v0.0.0
 - gomod: github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor v0.0.0
 - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.103.0
 - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.103.0
@@ -31,6 +32,7 @@ connectors:
 - gomod: github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector v0.0.0
 
 extensions:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.103.0
   - gomod: github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension v0.0.0
 
 replaces:
@@ -39,6 +41,7 @@ replaces:
 - github.com/CloudDetail/apo-otel-collector/pkg/sqlprune => ../pkg/sqlprune
 - github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector => ../pkg/connector/redmetricsconnector
 - github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension => ../pkg/extension/fillprocextension
+- github.com/CloudDetail/apo-otel-collector/pkg/processor/backsamplingprocessor => ../pkg/processor/backsamplingprocessor
 - github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor => ../pkg/processor/metadataprocessor
 - github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver => ../pkg/receiver/otlpreceiver
 - github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver => ../pkg/receiver/skywalkingreceiver

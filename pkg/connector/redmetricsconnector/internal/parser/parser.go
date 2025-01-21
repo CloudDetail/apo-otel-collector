@@ -68,7 +68,7 @@ func BuildServerKey(keyValue *cache.ReusedKeyValue, pid string, containerId stri
 	return keyValue.GetValue()
 }
 
-// buildExternalKey Http/Rpc Red指标
+// buildExternalKey Http/Rpc
 func BuildExternalKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, entryUrl string, name string, peer string, system string, isError bool) string {
 	keyValue.Reset()
 	keyValue.
@@ -85,7 +85,7 @@ func BuildExternalKey(keyValue *cache.ReusedKeyValue, pid string, containerId st
 	return keyValue.GetValue()
 }
 
-// buildDbKey DB Red指标
+// buildDbKey DB
 func buildDbKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, entryUrl string, dbSystem string, dbName string, name string, dbUrl string, isError bool) string {
 	keyValue.Reset()
 	keyValue.
@@ -103,7 +103,7 @@ func buildDbKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, 
 	return keyValue.GetValue()
 }
 
-// buildMqKey ActiveMq / RabbitMq / RocketMq / Kafka Red指标
+// buildMqKey ActiveMq / RabbitMq / RocketMq / Kafka
 func buildMqKey(keyValue *cache.ReusedKeyValue, pid string, containerId string, serviceName string, entryUrl string, name string, peer string, mqSystem string, isError bool, role string) string {
 	keyValue.Reset()
 	keyValue.
@@ -160,11 +160,9 @@ func GetClientPeer(attr pcommon.Map) string {
 }
 
 func getNodeName() string {
-	// 从环境变量获取NodeName
 	if nodeNameFromEnv, exist := os.LookupEnv(envNodeName); exist {
 		return nodeNameFromEnv
 	}
-	// 使用主机名作为NodeName
 	if hostName, err := os.Hostname(); err == nil {
 		return hostName
 	}
@@ -172,7 +170,6 @@ func getNodeName() string {
 }
 
 func getNodeIp() string {
-	// 从环境变量获取NodeIP
 	if nodeIpFromEnv, exist := os.LookupEnv(envNodeIP); exist {
 		return nodeIpFromEnv
 	}

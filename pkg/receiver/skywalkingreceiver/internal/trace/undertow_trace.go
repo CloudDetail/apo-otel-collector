@@ -36,12 +36,11 @@ func (c *UndertowCache) CheckUndertow(segment *agent.SegmentObject, ptd *ptrace.
 	}
 
 	if !isUndertow {
-		// Tomcat URL已收敛，直接返回
 		return ptd
 	}
 
 	if routeUrl == "" {
-		// XNIO-1 I/O 线程
+		// XNIO-1 I/O
 		key := fmt.Sprintf("%s-%s", segment.TraceId, segment.TraceSegmentId)
 
 		if cachedRouteUrl, exist := c.routeUrlMap.LoadAndDelete(key); exist {
@@ -52,7 +51,7 @@ func (c *UndertowCache) CheckUndertow(segment *agent.SegmentObject, ptd *ptrace.
 			return nil
 		}
 	} else {
-		// XNIO-1 task 线程
+		// XNIO-1 task
 		key := fmt.Sprintf("%s-%s", segment.TraceId, parentSegmentId)
 		if cachedTraceInterface, exist := c.ioTraceMap.LoadAndDelete(key); exist {
 			catchedTrace := cachedTraceInterface.(*ptrace.Traces)

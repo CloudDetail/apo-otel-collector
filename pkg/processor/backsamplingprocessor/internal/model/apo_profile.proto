@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+option go_package = ".;model";
+
+package kindling;
+
+// The Grpc service definition.
+service ProfileService {
+    rpc QueryProfiles (ProfileQuery) returns (ProfileResult);
+}
+
+message ProfileQuery {
+    int64 queryTime = 1;
+    string nodeIp = 2;
+    repeated string slowTraceIds = 3;
+    repeated string errorTraceIds = 4;
+    repeated string normalTraceIds = 5;
+}
+
+message ProfileResult {
+    int64 queryTime = 1;
+    uint32 sampleCount = 2;
+    repeated string slowTraceIds = 3;
+    repeated string errorTraceIds = 4;
+    repeated string closePidUrls = 5;
+    repeated string recoverPidUrls = 6;
+    repeated ProfileSignal signals = 7;
+    repeated string normalTraceIds = 8;
+}
+
+message ProfileSignal {
+    uint32 pid = 1;
+    uint32 tid = 2;
+    uint64 startTime = 3;
+    uint64 endTime = 4;
+}

@@ -52,7 +52,6 @@ func NewBuckets(size int) *Buckets {
 	}
 }
 
-// 同一线程执行，无需加锁
 func (bucket *Buckets) CopyAndGetBatch(batch Batch) (result Batch) {
 	bucket.buckets[bucket.writeIndex] = batch
 	bucket.writeIndex++

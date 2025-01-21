@@ -19,17 +19,15 @@ data:
       skywalking:
         protocols:
           grpc:
-            endpoint: 0.0.0.0:11800 # 接收 SkyWalking Agent 上报的 Trace 数据
+            endpoint: 0.0.0.0:11800
           http:
-            endpoint: 0.0.0.0:12800 # 接收从前端/ nginx 等 HTTP 协议上报的 Trace 数据
+            endpoint: 0.0.0.0:12800
     processors:
       batch:
         send_batch_size: 10000
         timeout: 2s
       metadata:
-        # 需要填充K8s信息的指标前缀
         metric_prefix: "kindling_"
-        # k8s数据源
         kube_source:
           # kube_auth_type, support serviceAccount and kubeConfig, default is serviceAccount
           kube_auth_type: serviceAccount

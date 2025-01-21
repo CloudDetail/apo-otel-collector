@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+option go_package = ".;model";
+
+package kindling;
+
+service TraceService {
+    rpc StoreDataGroups(DataGroups) returns (google.protobuf.Empty);
+}
+
+message DataGroups {
+    string name = 1;
+    repeated string datas = 2;
+}

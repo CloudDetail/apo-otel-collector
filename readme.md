@@ -1,7 +1,5 @@
 # apo-otel-collector
 
-使用 OpenTelemetry Collector Builder 创建自定义 Collector 实例，用于采集和接收 APO 的数据。
-
 ## Components
 ### Receivers
 - [otlpreceiver](./pkg/receiver/otlpreceiver)
@@ -13,6 +11,7 @@
 - [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor)
 - [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/memorylimiterprocessor)
 - [metadataprocessor](./pkg/processor/metadataprocessor)
+- [backsamplingprocessor](./pkg/processor/backsamplingprocessor)
 
 ### Connectors
 - [redmetricsconnector](./pkg/connector/redmetricsconnector)
@@ -29,30 +28,22 @@
 - [prometheusexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/prometheusexporter)
 
 ## Metadataprocessor
+Cache K8s information (Metasource) in memory. It receives input Metrics and fills in the K8s information for all metrics which has matches `container_id` label. 
 
-自制组件，用于在内存中维护一个K8s信息缓存 (Metasource)。接收输入的Metric，并将所有前缀匹配的指标，按其中包含的`container_id`标签填充k8s信息。
+There are three sources of K8s information: 
+1. Directly obtain K8s information from the K8s API.
+2. Pull the latest K8s information from another accessible Metasource.
+3. Start a network service to listen for data pushed from another Metasource. 
 
-K8s信息有三种数据来源:
+There are also have two ways of output K8s information:
+1. Start a network service to allow other Metasources to obtain K8s information from this instance.
+2. Push all the K8s information obtained by this instance to the specified other Metasource. 
 
-1. 从 K8s API 中直接获取 K8s 信息
-2. 从另一个可达的 Metasource 中拉取最新的 K8s 信息
-3. 启动一个网络服务，监听从另一个 Metasource 推送过来的数据
-
-同时提供两种输出 K8s 信息的方式:
-
-1. 启动一个网络服务，允许其他 Metasource 从本实例获取 K8s 信息
-2. 将本实例获取的所有 K8s 信息向指定的另一个 Metasource 推送
-
-另外可以提供一个查询端口，其他服务可以从指定端口查询存储的 K8s 元数据信息。程序内部可以使用 cache.Querier 接口查询存储的 K8s 元数据。
-
-配置文件示例:
-
+A query port is provided for other services to query the stored K8s metadata information from the specified port. Use `cache.Querier` API to query the stored K8s metadata.
 ```yaml
 processors:
   metadata:
-    # 需要填充K8s信息的指标前缀
     metric_prefix: "apo_"
-    # k8s数据源
     kube_source:
       # kube_auth_type, support serviceAccount and kubeConfig, default is serviceAccount
       kube_auth_type: serviceAccount
@@ -69,48 +60,32 @@ processors:
 ```
 
 ## Redmetricsconnector
-基于SpanMetrics进行二次开发，分桶数据基于ViectoryMetric的histogram库进行计算。
-最终生成 服务端RED指标 和 DB调用的RED指标
+Generate Red Metrics of Server / DB / External / Mq.
 
-配置文件示例:
 ```yaml
 connectors:
   redmetrics:
-    # 开启服务端RED指标生成
     server_enabled: true
-    # 开启DB RED指标生成
     db_enabled: true
-    # 开启HTTP/RPC对外调用 RED指标生成
     external_enabled: true
-    # 开启MQ RED指标生成
     mq_enabled: true
-    # 开启对外调用添加入口URL
     client_entry_url_enabled: false
-    # 缓存EntryUrl的时间
     cache_entry_url_time: 30s
-    # 未匹配的ExitSpan缓存时间
     unmatch_url_expire_time: 60s
-    # RED Key缓存的数量，超过则清理；用于清理已失效PID数据.
     dimensions_cache_size: 1000
-    # 指标发送间隔
     metrics_flush_interval: 60s
-    # 最大监控服务数，超过则将服务名打标为 overflow_service.
     max_services_to_track: 256
-    # 每个服务下最大URL数，超过则将URL打标为 overflow_operation.
     max_operations_to_track_per_service: 2048
     # vm(VictoriaMetrics) or prom(Promethues)
     metrics_type: "vm"
-    # Promethues场景下需指定分桶.
     latency_histogram_buckets: [5ms, 10ms, 20ms, 30ms, 50ms, 80ms, 100ms, 150ms, 200ms, 300ms, 400ms, 500ms, 800ms, 1200ms, 3s, 5s, 10s, 15s, 20s, 30s, 40s, 50s, 60s]
-    # URL收敛算法：httpMethod / topUrl
+    # httpMethod / topUrl
     http_parser: topUrl
 ```
 
 ## FillProcExtension
-FillProcExtension插件 基于Peer信息获取PID 和 ContainerId信息
-在原SkywalkingReceiver、OtelRecevier 基础上增加PID、ContainerId信息
+Add Pid and containerId for SkywalkingReceiver and OtelRecevier.
 
-配置示例
 ```yaml
 extensions:
   fill_proc:
@@ -137,4 +112,71 @@ service:
   pipelines:
     traces:
       receivers: [skywalking, otlp]
+```
+
+## BackSamplingProcessor
+* Notify and subscribe sampled traceIds from Receiver.
+* Notify Ebpf Agent to collect profiles.
+* Notify ilogtail to collect logs.
+* Adaptive Sampling, sache and store sampled traces.
+* Generate SampledCount Metrics.
+
+```yaml
+receivers:
+  prometheus/own_metrics:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 10s
+          static_configs:
+            - targets: ['0.0.0.0:1778']
+processors:
+  batch:
+    send_batch_size: 10000
+    timeout: 2s
+  backsampling:
+    # Notify EbpfAgent Collect OnOffMetric and Profile. It will be disabled when set to zero.
+    ebpf_port: 0
+    adaptive:
+      enable: false
+      span_slow_threshold: 10s
+      service_sample_window: 1s
+      service_sample_count: 1
+      memory_check_interval: 2s
+      memory_limit_mib_threshold: 200
+      traceid_holdtime: 60s
+    sampler:
+      log_enable: true
+      normal_top_sample: false
+      normal_sample_wait_time: 5
+      open_slow_sampling: true
+      open_error_sampling: true
+      enable_tail_base_profiling: true
+      sample_trace_repeat_num: 3
+      sample_trace_wait_time: 30
+      sample_trace_ignore_threshold: 0
+      silent_period: 5
+      silent_count: 1
+      silent_mode: window
+    controller:
+      host: 10.0.2.4
+      port: 19090
+      interval_query_slow_threshold: 30
+      interval_query_sample: 2
+      interval_send_trace: 1
+    notify:
+      enabled: false
+service:
+  telemetry:
+    metrics:
+      level: basic
+      address: ":1778"
+  pipelines:
+    traces:
+      receivers: [otlp, skywalking]
+      processors: [backsampling, batch]
+      exporters: [otlp]
+    metrics/own_metrics:
+      receivers: [prometheus/own_metrics]
+      exporters: [otlphttp/victoriametrics]
 ```

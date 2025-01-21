@@ -325,7 +325,6 @@ func setDbAttribute(dest pcommon.Map, key string, value string) bool {
 		dest.PutStr(conventions.AttributeDBName, value)
 	} else if key == "db.statement" {
 		dest.PutStr(conventions.AttributeDBStatement, value)
-		// 解析SQL语句
 		if value != "" {
 			if operation, table := sqlprune.SQLParseOperationAndTableNEW(value); operation != "" {
 				dest.PutStr(conventions.AttributeDBOperation, operation)
@@ -346,12 +345,11 @@ func setMqAttribute(dest pcommon.Map, key string, value string) bool {
 	if key == "mq.queue" {
 		dest.PutStr(conventions.AttributeMessagingDestinationName, value)
 	} else if key == "mq.topic" {
-		// 已赋值则不重新赋予
 		if _, exist := dest.Get(conventions.AttributeMessagingDestinationName); !exist {
 			dest.PutStr(conventions.AttributeMessagingDestinationName, value)
 		}
 	} else if key == "mq.broker" {
-		// MQ Consumer 未设置net.peer.name，此处通过通过mq.broker填充
+		// MQ Consumer
 		dest.PutStr(conventions.AttributeNetPeerName, value)
 	} else {
 		dest.PutStr(key, value)

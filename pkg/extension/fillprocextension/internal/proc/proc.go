@@ -28,32 +28,26 @@ func ScanProc(pid int) (p *ProcInfo) {
 	p = &ProcInfo{
 		ProcessID: pid,
 	}
-	// 存在Exe不存在
 	if p.ExeName, _ = GetExeName(pid); p.ExeName == "" {
 		p.Ignore = true
 		return
 	}
-	// 提取获取NetNameSpace，避免被黑名单过滤
 	if p.NetNamespace, _ = GetNetNamespace(pid); p.NetNamespace == "" {
 		p.Ignore = true
 		return
 	}
-	// 过滤黑名单Comm
 	if p.Comm, _ = GetComm(pid); SkipBlackComm(p.Comm) {
 		p.Ignore = true
 		return
 	}
-	// 过滤黑名单Cmdline
 	if p.CmdLine, _ = GetCommandLine(pid); SkipBlackCmdline(p.CmdLine) {
 		p.Ignore = true
 		return
 	}
-	// 存在进程不存在/etc/hostname文件，eg. pause
 	if p.HostName, _ = GetHostName(pid); p.HostName == "" {
 		p.Ignore = true
 		return
 	}
-	// 读取ContainerId
 	p.ContainerId, _ = GetContainerIDFromCGroup(pid)
 
 	return
@@ -125,7 +119,7 @@ func GetCommandLine(pid int) (string, error) {
 	if err != nil {
 		return "", err
 	} else {
-		// \u0000替换为空格
+		// \u0000 is replaced to blank
 		newByte := bytes.ReplaceAll([]byte(fileContent), []byte{0}, []byte{32})
 		newByte = bytes.TrimSpace(newByte)
 		return string(newByte), nil
@@ -137,7 +131,6 @@ func GetComm(pid int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// 移除换行符
 	return strings.TrimSuffix(string(fileContent), "\n"), nil
 }
 

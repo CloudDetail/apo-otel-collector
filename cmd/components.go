@@ -5,12 +5,14 @@ package main
 import (
 	redmetricsconnector "github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector"
 	fillprocextension "github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension"
+	backsamplingprocessor "github.com/CloudDetail/apo-otel-collector/pkg/processor/backsamplingprocessor"
 	metadataprocessor "github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor"
 	otlpreceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver"
 	skywalkingreceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver"
 	clickhouseexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter"
 	prometheusexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter"
 	prometheusremotewriteexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter"
+	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor"
 	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor"
 	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"
@@ -36,6 +38,7 @@ func components() (otelcol.Factories, error) {
 	factories := otelcol.Factories{}
 
 	factories.Extensions, err = extension.MakeFactoryMap(
+		pprofextension.NewFactory(),
 		fillprocextension.NewFactory(),
 	)
 	if err != nil {
@@ -69,6 +72,7 @@ func components() (otelcol.Factories, error) {
 	factories.Processors, err = processor.MakeFactoryMap(
 		batchprocessor.NewFactory(),
 		memorylimiterprocessor.NewFactory(),
+		backsamplingprocessor.NewFactory(),
 		metadataprocessor.NewFactory(),
 		k8sattributesprocessor.NewFactory(),
 		resourceprocessor.NewFactory(),

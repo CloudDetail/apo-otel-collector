@@ -120,8 +120,6 @@ func (m *metadataProcessor) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// TODO 考虑以后扩展为extensions模式
-// TODO 将metasource的log库输出接出到zap
 func (m *metadataProcessor) Start(ctx context.Context, host component.Host) error {
 	m.metaSource = metasource.CreateMetaSourceFromConfig(&m.cfg.MetaSourceConfig)
 	return m.metaSource.Run()

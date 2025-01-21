@@ -36,7 +36,6 @@ func (parser *MqParser) Parse(logger *zap.Logger, pid string, containerId string
 		mqSystem = mqSystemAttr.Str()
 	} else {
 		if span.Kind() == ptrace.SpanKindClient {
-			// 无法识别是否Mq，会识别为External
 			return ""
 		}
 		mqSystem = Unknown
@@ -57,7 +56,7 @@ func (parser *MqParser) Parse(logger *zap.Logger, pid string, containerId string
 }
 
 func getMessageDest(attr pcommon.Map, defaultValue string) string {
-	// 低版本 messaging.destination
+	// 1.x messaging.destination
 	if messageDest, found := attr.Get(AttributeMessageDest); found {
 		return messageDest.Str()
 	}

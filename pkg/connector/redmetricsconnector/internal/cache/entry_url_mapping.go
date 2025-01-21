@@ -67,14 +67,11 @@ func (cache *EntryUrlCache) GetMatchedResourceSpans(traces ptrace.Traces) []*Res
 	}
 
 	result := make([]*ResourceSpan, 0)
-	// 遍历未匹配的ExitSpan列表
 	for index := 0; index < len(cache.unMatchedSpans); index++ {
 		unMatchedSpan := cache.unMatchedSpans[index]
 		if traceMapping, found := cachedTraces[unMatchedSpan.Span.TraceID()]; found {
 			if entryUrl := traceMapping.GetEntrySpanName(unMatchedSpan.Span.ParentSpanID()); entryUrl != "" {
 				result = append(result, unMatchedSpan.SetEntryUrl(entryUrl))
-
-				// 删除已匹配的
 				cache.unMatchedSpans = append(cache.unMatchedSpans[:index], cache.unMatchedSpans[index+1:]...)
 				index--
 			}
@@ -82,12 +79,10 @@ func (cache *EntryUrlCache) GetMatchedResourceSpans(traces ptrace.Traces) []*Res
 	}
 
 	expireTime := time.Now().Unix() + cache.expireUnMatcheTime
-	// 基于Resource遍历
 	for i := 0; i < resourceSpans.Len(); i++ {
 		rss := resourceSpans.At(i)
 		pid, serviceName, containerId := GetResourceAttribute(rss)
 		if pid == "" || serviceName == "" {
-			// 必须存在PID 和 服务名
 			continue
 		}
 		ilsSlice := rss.ScopeSpans()
@@ -238,12 +233,10 @@ func GetResourceAttribute(rss ptrace.ResourceSpans) (pid string, serviceName str
 	resourceAttr := resource.Attributes()
 	pidIntValue := fillproc.GetPid(resourceAttr)
 	if pidIntValue <= 0 {
-		// 必须存在PID
 		return
 	}
 	serviceAttr, ok := resourceAttr.Get(conventions.AttributeServiceName)
 	if !ok {
-		// 必须存在服务名
 		return
 	}
 	pid = strconv.FormatInt(pidIntValue, 10)

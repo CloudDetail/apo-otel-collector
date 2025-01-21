@@ -46,10 +46,10 @@ type connectorImp struct {
 	mqParser   parser.Parser
 
 	// Histogram.
-	serverHistograms       map[metricKey]cache.Histogram // 服务 指标
-	dbCallHistograms       map[metricKey]cache.Histogram // db 指标
-	externalCallHistograms map[metricKey]cache.Histogram // external 指标
-	mqCallHistograms       map[metricKey]cache.Histogram // mq 指标
+	serverHistograms       map[metricKey]cache.Histogram
+	dbCallHistograms       map[metricKey]cache.Histogram
+	externalCallHistograms map[metricKey]cache.Histogram
+	mqCallHistograms       map[metricKey]cache.Histogram
 	bounds                 []float64
 
 	keyValue *cache.ReusedKeyValue
@@ -132,7 +132,7 @@ func newConnector(logger *zap.Logger, config component.Config, ticker *clock.Tic
 		externalCallHistograms:                 make(map[metricKey]cache.Histogram),
 		mqCallHistograms:                       make(map[metricKey]cache.Histogram),
 		bounds:                                 bounds,
-		keyValue:                               cache.NewReusedKeyValue(100), // 最大100的KeyValue 可重用Map
+		keyValue:                               cache.NewReusedKeyValue(100),
 		metricKeyToDimensions:                  metricKeyToDimensionsCache,
 		dbCallMetricKeyToDimensions:            dbMetricKeyToDimensionsCache,
 		externalCallMetricKeyToDimensions:      externalMetricKeyToDimensionsCache,
@@ -257,7 +257,6 @@ func (p *connectorImp) ConsumeTraces(_ context.Context, traces ptrace.Traces) er
 
 			pid, serviceName, containerId := cache.GetResourceAttribute(rss)
 			if pid == "" || serviceName == "" {
-				// 必须存在PID 和 服务名
 				continue
 			}
 			ilsSlice := rss.ScopeSpans()
@@ -455,7 +454,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 
 	if p.config.ServerEnabled && (span.Kind() == ptrace.SpanKindServer || span.Kind() == ptrace.SpanKindConsumer) {
 		swSpanId, exist := span.Attributes().Get(AttributeSkywalkingSpanID)
-		// 过滤Skywalking Undertow task线程的SpringMVC Entry
+		// Ignore SpringMVC Entry in [Skywalking Undertow task].
 		if !exist || swSpanId.Int() == 0 {
 			key := metricKey(p.buildServerKey(pid, containerId, serviceName, span))
 			if _, has := p.metricKeyToDimensions.Get(key); !has {
@@ -487,7 +486,6 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 				_, dbSystemExist := spanAttr.Get(conventions.AttributeDBSystem)
 				_, mqSystemExist := spanAttr.Get(conventions.AttributeMessagingSystem)
 				if !dbSystemExist && !mqSystemExist {
-					// 过滤DB 和 Mq
 					externalKey = parser.BuildExternalKey(p.keyValue, pid, containerId, serviceName, entryUrl,
 						span.Name(),
 						parser.GetClientPeer(spanAttr),
@@ -517,7 +515,7 @@ func (p *connectorImp) aggregateMetricsForSpan(pid string, containerId string, s
 	}
 }
 
-// buildKey Server Red指标
+// buildKey Server
 func (p *connectorImp) buildServerKey(pid string, containerId string, serviceName string, span *ptrace.Span) string {
 	spanName := span.Name()
 	if len(p.serviceToOperations) > p.maxNumberOfServicesToTrack {

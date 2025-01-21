@@ -74,7 +74,6 @@ func DoNetstat(path string, peers map[string]int, result map[string]*SockTabEntr
 		}
 
 		peer := localAddr.String()
-		// 四元组 && Port匹配
 		if matchPort, found := peers[peer]; found && remoteAddr.Port == uint16(matchPort) {
 			result[peer] = &SockTabEntry{
 				Ino:        fields[9],

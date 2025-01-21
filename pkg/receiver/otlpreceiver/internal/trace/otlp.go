@@ -150,7 +150,6 @@ func (r *Receiver) fillPidAndContainerId(resourceAttr pcommon.Map, pid int, cont
 	} else {
 		if resContainerId := getContainerId(resourceAttr); resContainerId != "" {
 			if containerId != "" && resContainerId == containerId && pid > 0 {
-				// FIX 存在网络挟持时containerId不匹配则过滤
 				resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
 				resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
 			}
@@ -159,7 +158,6 @@ func (r *Receiver) fillPidAndContainerId(resourceAttr pcommon.Map, pid int, cont
 				resourceAttr.PutInt(fillproc.KEY_PID, int64(pid))
 			}
 			if containerId != "" {
-				// Python等Otel探针缺失containerId信息，此处补充
 				resourceAttr.PutStr(fillproc.KEY_CONTAINERID, containerId)
 			}
 		}

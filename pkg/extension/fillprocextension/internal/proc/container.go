@@ -30,7 +30,7 @@ func GetContainerIDFromCGroup(pid int) (string, error) {
 
 	containerId := getContainerIDFromReader(file)
 	if len(containerId) < 12 {
-		// 存在 1:name=systemd:/user.slice/user-0.slice/session-3750.scope
+		// Ignore 1:name=systemd:/user.slice/user-0.slice/session-3750.scope
 		return "", nil
 	}
 	return containerId, nil

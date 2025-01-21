@@ -30,13 +30,12 @@ func newSocketProcExtension(settings extension.Settings, config component.Config
 
 	interval := cfg.Interval
 	if interval.Microseconds() < 1000 {
-		// 不允许设置1秒以下的定时间隔.
 		interval = defaultSocketProcInterval
 	}
 
 	enable := cfg.Enable
 	if enable {
-		// Windows环境没有访问/proc权限，现只支持Linux.
+		// Windows is not supported.
 		enable = proc.AccessProc()
 	}
 	socketProc := &SocketProcExtension{
@@ -92,16 +91,13 @@ func (p *SocketProcExtension) getMatchPidAndContainerId(peerAddr string, serverA
 		peer = fmt.Sprintf("::1:%s", peer[6:])
 	}
 
-	// 获取已关联Proc
 	if procInterface, found := p.cache.CachedSockets.Load(peer); found {
 		procInfo := procInterface.(*proc.ProcInfo)
 		return procInfo.ProcessID, procInfo.ContainerId
 	}
 
-	// 判断是否已存储待关联Peer
 	if _, exist := p.cache.ToMapSockets.Load(peer); !exist {
 		port, _ := strconv.Atoi(serverAddr[strings.LastIndex(serverAddr, ":")+1:])
-		// 记录Peer到待关联列表
 		p.cache.ToMapSockets.Store(peer, port)
 	}
 	return 0, ""

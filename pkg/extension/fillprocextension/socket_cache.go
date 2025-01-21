@@ -27,7 +27,6 @@ func (c *SocketCache) mapSocketToPids() {
 	toMatchPeers := make(map[string]int)
 	c.ToMapSockets.Range(func(k, v interface{}) bool {
 		toMatchPeers[k.(string)] = v.(int)
-		// 清理待匹配peers
 		c.ToMapSockets.Delete(k)
 		return true
 	})
@@ -35,7 +34,6 @@ func (c *SocketCache) mapSocketToPids() {
 	if len(toMatchPeers) > 0 {
 		c.scanNewProcs()
 		if c.activeProcNum == 0 {
-			// Windows环境无法扫描进程信息，返回空.
 			return
 		}
 		if c.HostNetNamespace == "" {
@@ -69,7 +67,6 @@ func (c *SocketCache) scanNewProcs() {
 
 	c.Procs.Range(func(k, v interface{}) bool {
 		if _, exist := pids[k.(int)]; !exist {
-			// 清理已删除PID
 			c.Procs.Delete(k)
 			c.activeProcNum -= 1
 		}
@@ -78,7 +75,6 @@ func (c *SocketCache) scanNewProcs() {
 
 	for pid := range pids {
 		if _, ok := c.Procs.Load(pid); !ok {
-			// 新增PID
 			process := proc.ScanProc(pid)
 			c.Procs.Store(pid, process)
 			c.activeProcNum += 1
@@ -96,20 +92,16 @@ func (c *SocketCache) scanNewProcs() {
 
 func (c *SocketCache) matchSockets(peers map[string]int) map[string]*proc.ProcInfo {
 	result := make(map[string]*proc.ProcInfo)
-	// 先分析检索VM的Proc，VM应用由于共用同一个Net，需相关遍历/proc/{pid}/fd文件夹
+	// VM
 	if socks, err := proc.ListVMMatchNetSocks(peers); err == nil && len(socks) > 0 {
-		// 基于Peer寻找到对应的Sock
 		c.Procs.Range(func(k, v interface{}) bool {
 			procInfo := v.(*proc.ProcInfo)
 			if procInfo.Ignore {
-				// 考虑到容器应用也允许 开启主机模式，不对进程做过滤
-				// 不分析Ignore
 				return true
 			}
 			if matchPeers := procInfo.GetMatchNetSockets(socks); len(matchPeers) > 0 {
 				for _, matchPeer := range matchPeers {
 					result[matchPeer] = procInfo
-					// 移除peers，减少后续检索
 					delete(socks, matchPeer)
 					delete(peers, matchPeer)
 				}
@@ -129,22 +121,19 @@ func (c *SocketCache) matchSockets(peers map[string]int) map[string]*proc.ProcIn
 		c.Procs.Range(func(k, v interface{}) bool {
 			procInfo := v.(*proc.ProcInfo)
 			if procInfo.Ignore || procInfo.NetNamespace == c.HostNetNamespace {
-				// 不分析Ignore 和 虚机场景
 				return true
 			}
-			// 容器网络场景，分析每个PID的tcp数据
+			// Container
 			if socks, err := procInfo.ListMatchNetSocks(peers); err == nil && len(socks) > 0 {
 				if matchPeers := procInfo.GetMatchNetSockets(socks); len(matchPeers) > 0 {
 					for _, matchPeer := range matchPeers {
 						result[matchPeer] = procInfo
-						// 移除peers，减少后续检索
 						delete(peers, matchPeer)
 					}
 				}
 			}
 
 			if len(peers) == 0 {
-				// 已完全匹配，提前退出
 				return false
 			}
 			return true
