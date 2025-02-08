@@ -20,8 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       IMAGE_TAG_NAME: ${{ steps.build-image.outputs.IMAGE_TAG_NAME }}
-      IMAGE_FULL_TAG_AMD64: ${{ steps.build-image.outputs.IMAGE_FULL_TAG_AMD64 }}
-      IMAGE_FULL_TAG_ARM64: ${{ steps.build-image.outputs.IMAGE_FULL_TAG_ARM64 }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -49,8 +47,8 @@ jobs:
           BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's#[^a-zA-Z0-9._-]#-#g')
           IMAGE_TAG_NAME="${BRANCH_NAME}-${COMMIT_HASH::7}-${DATE}"
           echo "IMAGE_TAG_NAME=$IMAGE_TAG_NAME" >> "$GITHUB_OUTPUT"
-          echo "IMAGE_FULL_TAG_AMD64=${{ env.REGISTRY_HOST }}/${{ secrets.REGISTRY_USERNAME }}/${{ env.CONTAINER_NAME }}:${IMAGE_TAG_NAME}" >> "$GITHUB_OUTPUT"
-          echo "IMAGE_FULL_TAG_ARM64=${{ env.REGISTRY_HOST }}/${{ secrets.REGISTRY_USERNAME }}/${{ env.CONTAINER_NAME }}:${IMAGE_TAG_NAME}-arm64" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_FULL_TAG_AMD64=${{ env.REGISTRY_HOST }}/${{ secrets.REGISTRY_USERNAME }}/${{ env.CONTAINER_NAME }}:${IMAGE_TAG_NAME}" >> $GITHUB_ENV  
+          echo "IMAGE_FULL_TAG_ARM64=${{ env.REGISTRY_HOST }}/${{ secrets.REGISTRY_USERNAME }}/${{ env.CONTAINER_NAME }}:${IMAGE_TAG_NAME}-arm64" >> $GITHUB_ENV
 
       - name: Build and push AMD64 image
         uses: docker/build-push-action@v5
@@ -58,7 +56,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: ${{ steps.build-image.outputs.IMAGE_FULL_TAG_AMD64 }}
+          tags: ${{ env.IMAGE_FULL_TAG_AMD64 }}
 
       - name: Build and push ARM64 image
         uses: docker/build-push-action@v5
@@ -66,7 +64,7 @@ jobs:
           context: .
           platforms: linux/arm64
           push: true
-          tags: ${{ steps.build-image.outputs.IMAGE_FULL_TAG_ARM64 }}
+          tags: ${{ env.IMAGE_FULL_TAG_ARM64 }}
 
   deploy-dev:
     runs-on: [self-hosted, dev]
@@ -75,15 +73,14 @@ jobs:
     steps:
       - name: Deploy to dev
         env:
-          IMAGE_FULL_NAME_AMD64: ${{ needs.build-image.outputs.IMAGE_FULL_TAG_AMD64 }}
-          IMAGE_FULL_NAME_ARM64: ${{ needs.build-image.outputs.IMAGE_FULL_TAG_ARM64 }}
+          IMAGE_TAG_NAME: ${{ needs.build-image.outputs.IMAGE_TAG_NAME }}
         run: |
           # Detect the node architecture
           NODE_ARCH=$(kubectl get node -o jsonpath='{.items[0].status.nodeInfo.architecture}')
           if [ "$NODE_ARCH" = "arm64" ]; then
-            IMAGE_FULL_NAME=${{ env.IMAGE_FULL_NAME_ARM64 }}
+            IMAGE_FULL_NAME="${{ env.REGISTRY_HOST }}/${{ secrets.REGISTRY_USERNAME }}/${{ env.CONTAINER_NAME }}:${IMAGE_TAG_NAME}-arm64"
           else
-            IMAGE_FULL_NAME=${{ env.IMAGE_FULL_NAME_AMD64 }}
+            IMAGE_FULL_NAME="${{ env.REGISTRY_HOST }}/${{ secrets.REGISTRY_USERNAME }}/${{ env.CONTAINER_NAME }}:${IMAGE_TAG_NAME}"
           fi
           echo "IMAGE_FULL_NAME=$IMAGE_FULL_NAME"
           export KUBECONFIG="/root/.kube/config"
