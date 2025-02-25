@@ -98,7 +98,8 @@ func (sampler *AdaptiveSampler) CheckAdaptiveSampleValue(traceId pcommon.TraceID
 	}
 
 	index := 15
-	if swTraceId != "" {
+	if len(swTraceId) > 32 {
+		// skywalking java
 		index = 10
 	}
 	value := uint32(traceId[index-1])<<8 | uint32(traceId[index])
