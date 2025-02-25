@@ -229,11 +229,12 @@ func (bsp *backSamplingProcessor) ConsumeTraces(ctx context.Context, traces ptra
 			if serviceName == "" {
 				continue
 			}
+			swTraceId := getSkywalkingTraceId(resource)
 			idToSpans := groupSpansByTraceId(rss)
 			for traceId, spans := range idToSpans {
 				bsp.telemetry.ProcessorBackSamplingSpanCount.Add(bsp.ctx, int64(len(spans)), measureSampleReceived)
 				// Adaptive PreSample
-				adaptiveResult := bsp.adaptiveSampler.Sample(traceId, serviceName, spans)
+				adaptiveResult := bsp.adaptiveSampler.Sample(traceId, swTraceId, serviceName, spans)
 				if adaptiveResult.IsDrop() {
 					bsp.telemetry.ProcessorBackSamplingSpanCount.Add(bsp.ctx, int64(len(spans)), measureSampleDrop)
 					continue
@@ -541,4 +542,12 @@ func getAppInfo(resource pcommon.Resource) (pid uint32, serviceName string, cont
 		containerId = containerId[:12]
 	}
 	return
+}
+
+func getSkywalkingTraceId(resource pcommon.Resource) string {
+	resourceAttr := resource.Attributes()
+	if swTraceIdAttr, ok := resourceAttr.Get("sw8.trace_id"); ok {
+		return swTraceIdAttr.Str()
+	}
+	return ""
 }

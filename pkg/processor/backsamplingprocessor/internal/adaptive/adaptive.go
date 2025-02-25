@@ -70,8 +70,8 @@ func (sampler *AdaptiveSampler) SetSampleValue(newValue int64) {
 	sampler.sampleValue.Store(newValue)
 }
 
-func (sampler *AdaptiveSampler) Sample(traceId pcommon.TraceID, serviceName string, spans []*ptrace.Span) SampleResult {
-	if sampler.CheckAdaptiveSampleValue(traceId) {
+func (sampler *AdaptiveSampler) Sample(traceId pcommon.TraceID, swTraceId string, serviceName string, spans []*ptrace.Span) SampleResult {
+	if sampler.CheckAdaptiveSampleValue(traceId, swTraceId) {
 		return Sampled
 	}
 
@@ -91,13 +91,17 @@ func (sampler *AdaptiveSampler) Sample(traceId pcommon.TraceID, serviceName stri
 	return SampleDrop
 }
 
-func (sampler *AdaptiveSampler) CheckAdaptiveSampleValue(traceId pcommon.TraceID) bool {
+func (sampler *AdaptiveSampler) CheckAdaptiveSampleValue(traceId pcommon.TraceID, swTraceId string) bool {
 	sampleValue := sampler.sampleValue.Load()
 	if sampleValue == 0 {
 		return true
 	}
 
-	value := uint32(traceId[14])<<8 | uint32(traceId[15])
+	index := 15
+	if swTraceId != "" {
+		index = 10
+	}
+	value := uint32(traceId[index-1])<<8 | uint32(traceId[index])
 	return value&(1<<sampleValue-1) == 0
 }
 
