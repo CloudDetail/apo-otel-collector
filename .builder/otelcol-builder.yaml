@@ -26,6 +26,7 @@ processors:
 - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.103.0
 - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.103.0
 - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.103.0
+- gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.103.0
 
 connectors:
 - gomod: github.com/CloudDetail/apo-otel-collector/pkg/connector/redmetricsconnector v0.0.0
