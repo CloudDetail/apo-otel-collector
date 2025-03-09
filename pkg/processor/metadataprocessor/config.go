@@ -8,7 +8,8 @@ import (
 // Config defines configuration for batch processor.
 type Config struct {
 	metacfg.MetaSourceConfig `mapstructure:",squash"`
-	MetricPrefix             string `mapstructure:"metric_prefix"`
+	MetricPrefix             string   `mapstructure:"metric_prefix"`
+	MetricPrefixs            []string `mapstructure:"metric_prefixs"`
 }
 
 var _ component.Config = (*Config)(nil)
