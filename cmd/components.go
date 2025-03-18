@@ -15,6 +15,7 @@ import (
 	prometheusremotewriteexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor"
+	filterprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
 	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor"
 	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"
 	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
@@ -79,6 +80,7 @@ func components() (otelcol.Factories, error) {
 		k8sattributesprocessor.NewFactory(),
 		resourceprocessor.NewFactory(),
 		attributesprocessor.NewFactory(),
+		filterprocessor.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

@@ -70,38 +70,44 @@ func (sampler *AdaptiveSampler) SetSampleValue(newValue int64) {
 	sampler.sampleValue.Store(newValue)
 }
 
-func (sampler *AdaptiveSampler) Sample(traceId pcommon.TraceID, serviceName string, spans []*ptrace.Span) SampleResult {
-	if sampler.CheckAdaptiveSampleValue(traceId) {
+func (sampler *AdaptiveSampler) Sample(traceId pcommon.TraceID, swTraceId string, serviceName string, spans []*ptrace.Span) SampleResult {
+	if sampler.CheckAdaptiveSampleValue(traceId, swTraceId) {
 		return Sampled
 	}
 
-	if _, ok := sampler.singleIds.Load(traceId); ok {
+	key := fmt.Sprintf("%s-%s", serviceName, traceId.String())
+	if _, ok := sampler.singleIds.Load(key); ok {
 		return SampleLow
 	}
 
 	for _, span := range spans {
 		if uint64(span.EndTimestamp()) > uint64(span.StartTimestamp())+sampler.slowThreshold {
-			sampler.singleIds.Store(traceId, &atomic.Int32{})
+			sampler.singleIds.Store(key, &atomic.Int32{})
 			return SampleSlow
 		}
-		if sampler.CheckLowUrl(traceId, serviceName, span) {
+		if sampler.CheckLowUrl(key, traceId, serviceName, span) {
 			return SampleLow
 		}
 	}
 	return SampleDrop
 }
 
-func (sampler *AdaptiveSampler) CheckAdaptiveSampleValue(traceId pcommon.TraceID) bool {
+func (sampler *AdaptiveSampler) CheckAdaptiveSampleValue(traceId pcommon.TraceID, swTraceId string) bool {
 	sampleValue := sampler.sampleValue.Load()
 	if sampleValue == 0 {
 		return true
 	}
 
-	value := uint32(traceId[14])<<8 | uint32(traceId[15])
+	index := 15
+	if len(swTraceId) > 32 {
+		// skywalking java
+		index = 10
+	}
+	value := uint32(traceId[index-1])<<8 | uint32(traceId[index])
 	return value&(1<<sampleValue-1) == 0
 }
 
-func (sampler *AdaptiveSampler) CheckLowUrl(traceId pcommon.TraceID, serviceName string, span *ptrace.Span) bool {
+func (sampler *AdaptiveSampler) CheckLowUrl(key string, traceId pcommon.TraceID, serviceName string, span *ptrace.Span) bool {
 	if sampler.serviceWindowCount > 0 && traceutil.IsEntrySpan(span) {
 		key := fmt.Sprintf("%s-%s", serviceName, span.Name())
 
@@ -114,7 +120,7 @@ func (sampler *AdaptiveSampler) CheckLowUrl(traceId pcommon.TraceID, serviceName
 			sampler.serviceUrlCount.Add(1)
 		}
 		if tps.Add(1) <= sampler.serviceWindowCount {
-			sampler.singleIds.Store(traceId, &atomic.Int32{})
+			sampler.singleIds.Store(key, &atomic.Int32{})
 			return true
 		}
 	}

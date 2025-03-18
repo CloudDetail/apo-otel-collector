@@ -27,6 +27,9 @@ type metadataProcessor struct {
 }
 
 func newMetadataProcessor(set processor.Settings, nextConsumer consumer.Metrics, cfg *Config) (*metadataProcessor, error) {
+	if len(cfg.MetricPrefix) > 0 {
+		cfg.MetricPrefixs = append(cfg.MetricPrefixs, cfg.MetricPrefix)
+	}
 	return &metadataProcessor{
 		cfg:          cfg,
 		logger:       set.Logger,
@@ -48,7 +51,15 @@ func (m *metadataProcessor) ConsumeMetrics(ctx context.Context, md pmetric.Metri
 			metrics := ils.Metrics()
 			for k := 0; k < metrics.Len(); k++ {
 				metric := metrics.At(k)
-				if strings.HasPrefix(metric.Name(), m.cfg.MetricPrefix) {
+
+				var needFill bool
+				for _, metricPrefix := range m.cfg.MetricPrefixs {
+					if strings.HasPrefix(metric.Name(), metricPrefix) {
+						needFill = true
+						break
+					}
+				}
+				if needFill {
 					m.FillWithK8sMetadata(ctx, metric)
 				}
 			}

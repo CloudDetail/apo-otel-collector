@@ -617,6 +617,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometh
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheusremotewrite v0.103.0/go.mod h1:+3rCl7Z3Zm4ZZOyX9lMmaAoN8NeeCXUOmR/tysR631g=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.103.0 h1:c5sOZWBMD/gyKxqwGgS6cwLdvkg6W8I3/0RZOm84xA0=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.103.0/go.mod h1:2CG+06d3sh+O36maAs2TPAbNRXZ0zcqY2kH5pEABrzg=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.103.0 h1:u2ZcBCuOXpD7FIm+LZrhEMhi/Ny/mhivAfuCUpPzrUg=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.103.0/go.mod h1:9n3OvWN10XXyg+o71jeuO94u8mEWOI90Vg8y3M7zpE0=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.103.0 h1:v19lfgrsflmimm0LGOZoB51eNO0305Yud6LCnhS7LPY=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.103.0/go.mod h1:Z8OvUd7UJJpyXT2O5ma8QT42NfkP/7Q0l1oxStJ/5MY=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.103.0 h1:Gg2j3yN2iCQYwK+464RyVvmX+QyjjdXL3JpG+6BfDAQ=

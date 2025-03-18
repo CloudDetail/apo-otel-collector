@@ -19,6 +19,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.103.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.103.0

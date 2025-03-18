@@ -34,10 +34,10 @@ func NewSilent(silentCount int, silentPeriod int64, silentMode string) *Silent {
 }
 
 func (silent *Silent) IsSilent(pidUrl string) bool {
-	if silent.count == 0 {
+	if silent.count <= 0 {
 		return true
 	}
-	if silent.period == 0 {
+	if silent.period <= 0 {
 		return false
 	}
 
@@ -45,7 +45,7 @@ func (silent *Silent) IsSilent(pidUrl string) bool {
 		return silentDataInterface.(*SilentData).checkSilent()
 	} else {
 		silent.pidUrlDatas.Store(pidUrl, &SilentData{
-			leftCount: silent.count,
+			leftCount: silent.count - 1,
 		})
 		return false
 	}
@@ -101,7 +101,7 @@ type SilentData struct {
 }
 
 func (silent *SilentData) checkSilent() bool {
-	if silent.leftCount == 0 {
+	if silent.leftCount <= 0 {
 		return true
 	}
 	if silent.leftCount == 1 {
