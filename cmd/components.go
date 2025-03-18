@@ -8,6 +8,7 @@ import (
 	backsamplingprocessor "github.com/CloudDetail/apo-otel-collector/pkg/processor/backsamplingprocessor"
 	metadataprocessor "github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor"
 	otlpreceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver"
+	prometheusremotewritereceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/prometheusremotewritereceiver"
 	skywalkingreceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver"
 	clickhouseexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter"
 	prometheusexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter"
@@ -51,6 +52,7 @@ func components() (otelcol.Factories, error) {
 		k8seventsreceiver.NewFactory(),
 		otlpreceiver.NewFactory(),
 		skywalkingreceiver.NewFactory(),
+		prometheusremotewritereceiver.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

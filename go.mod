@@ -12,6 +12,7 @@ require (
 	github.com/CloudDetail/apo-otel-collector/pkg/processor/backsamplingprocessor v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver v0.0.0
+	github.com/CloudDetail/apo-otel-collector/pkg/receiver/prometheusremotewritereceiver v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver v0.0.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter v0.103.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.103.0
@@ -277,7 +278,7 @@ require (
 	gonum.org/v1/gonum v0.15.0 // indirect
 	google.golang.org/api v0.169.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240520151616-dc85e6b867a5 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240520151616-dc85e6b867a5 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240610135401-a8a62080eff3 // indirect
 	google.golang.org/grpc v1.64.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -313,3 +314,5 @@ replace github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocesso
 replace github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver => ./pkg/receiver/otlpreceiver
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver => ./pkg/receiver/skywalkingreceiver
+
+replace github.com/CloudDetail/apo-otel-collector/pkg/receiver/prometheusremotewritereceiver => ./pkg/receiver/prometheusremotewritereceiver
