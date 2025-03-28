@@ -54,13 +54,13 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...teleme
 		builder.meter = noop.Meter{}
 	}
 	builder.ProcessorBackSamplingSampleValue, err = builder.meter.Int64Gauge(
-		"processor_back_sampling_sample_value",
+		"otelcol_processor_back_sampling_sample_value",
 		metric.WithDescription("Sample Value of the spans."),
 		metric.WithUnit("1"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorBackSamplingSpanCount, err = builder.meter.Int64Counter(
-		"processor_back_sampling_span_count",
+		"otelcol_processor_back_sampling_span_count",
 		metric.WithDescription("Number of spans that were sampled due to sample decision hit."),
 		metric.WithUnit("{spans}"),
 	)
