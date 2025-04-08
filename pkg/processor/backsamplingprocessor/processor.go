@@ -108,6 +108,7 @@ func newTracesProcessor(ctx context.Context, settings component.TelemetrySetting
 		cfg.Sampler.OpenSlowSampling,
 		cfg.Sampler.OpenErrorSampling,
 		cfg.Sampler.SampleIgnoreThreshold*1000000,
+		cfg.Sampler.SampleSlowThreshold*1000000,
 	).WithNormalSampler(
 		cfg.Sampler.NormalTopSample,
 		cfg.Sampler.NormalSampleWaitTime,

@@ -9,22 +9,24 @@ import (
 )
 
 type SampleCache struct {
-	normalTopSampling  bool
-	normalSampler      NoramlSampler
-	tailbaseSamplers   *TailbaseSamplers
-	openNormalSampling bool
-	openSlowSampling   bool
-	openErrorSampling  bool
-	ignoreThreshold    uint64
-	slowThresholdCache *ContainerSlowThreshold
-	silent             *Silent
+	normalTopSampling    bool
+	normalSampler        NoramlSampler
+	tailbaseSamplers     *TailbaseSamplers
+	openNormalSampling   bool
+	openSlowSampling     bool
+	openErrorSampling    bool
+	ignoreThreshold      uint64
+	defaultSlowThreshold uint64
+	slowThresholdCache   *ContainerSlowThreshold
+	silent               *Silent
 }
 
-func NewSampleCache(slowSampling bool, errorSampling bool, ignoreThreshold uint64) *SampleCache {
+func NewSampleCache(slowSampling bool, errorSampling bool, ignoreThreshold uint64, slowThreshold uint64) *SampleCache {
 	return &SampleCache{
-		openSlowSampling:  slowSampling,
-		openErrorSampling: errorSampling,
-		ignoreThreshold:   ignoreThreshold,
+		openSlowSampling:     slowSampling,
+		openErrorSampling:    errorSampling,
+		ignoreThreshold:      ignoreThreshold,
+		defaultSlowThreshold: slowThreshold,
 	}
 }
 
@@ -47,7 +49,7 @@ func (c *SampleCache) WithSilent(silentCount int, silentPeriod int64, silentMode
 }
 
 func (c *SampleCache) GetSampleResult(trace *model.TraceLabels) SampleResult {
-	c.CheckSlow(trace)
+	c.CheckSlow(trace, c.defaultSlowThreshold)
 
 	if !c.openNormalSampling && !c.openSlowSampling && !c.openErrorSampling {
 		return SampleResultNoOp
@@ -101,8 +103,8 @@ func (c *SampleCache) UpdateUnSentCount(slowCount int, errorCount int, normalCou
 	c.tailbaseSamplers.normalSampler.updateUnSentCount(normalCount)
 }
 
-func (c *SampleCache) CheckSlow(trace *model.TraceLabels) {
-	threshold := c.slowThresholdCache.getSlowThreshold(trace.Url)
+func (c *SampleCache) CheckSlow(trace *model.TraceLabels, slowThreshold uint64) {
+	threshold := c.slowThresholdCache.getSlowThreshold(trace.Url, slowThreshold)
 	trace.ThresholdRange = threshold.thresholdRange
 	trace.ThresholdType = threshold.thresholdType
 	trace.ThresholdValue = threshold.thresholdValue
@@ -183,14 +185,14 @@ func (threshold *ContainerSlowThreshold) updateSlowThreshold(data *grpc_model.Sl
 	}
 }
 
-func (threshold *ContainerSlowThreshold) getSlowThreshold(url string) *SlowThreshold {
+func (threshold *ContainerSlowThreshold) getSlowThreshold(url string, slowThreshold uint64) *SlowThreshold {
 	if dataInterface, ok := threshold.thresholdValues.Load(url); ok {
 		return dataInterface.(*SlowThreshold)
 	} else {
 		return &SlowThreshold{
 			thresholdType:     model.P90ThresholdType,
 			thresholdRange:    model.ThresholdRange("default"),
-			thresholdValue:    500.0 * 1e6,
+			thresholdValue:    float64(slowThreshold),
 			thresholdMultiple: 1.0,
 		}
 	}

@@ -33,6 +33,7 @@ func createDefaultConfig() component.Config {
 			SampleRetryNum:          3,
 			SampleWaitTime:          60,
 			SampleIgnoreThreshold:   0,
+			SampleSlowThreshold:     100,
 			SilentPeriod:            5,
 			SilentCount:             1,
 			SilentMode:              "window",

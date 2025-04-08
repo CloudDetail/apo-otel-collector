@@ -148,13 +148,14 @@ processors:
     sampler:
       log_enable: true
       normal_top_sample: false
-      normal_sample_wait_time: 5
+      normal_sample_wait_time: 60
       open_slow_sampling: true
       open_error_sampling: true
       enable_tail_base_profiling: true
       sample_trace_repeat_num: 3
       sample_trace_wait_time: 30
       sample_trace_ignore_threshold: 0
+      sample_trace_slow_threshold_ms: 100
       silent_period: 5
       silent_count: 1
       silent_mode: window

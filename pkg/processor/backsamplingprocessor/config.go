@@ -30,6 +30,7 @@ type SamplerConfig struct {
 	SampleRetryNum          int    `mapstructure:"sample_trace_repeat_num"`
 	SampleWaitTime          int    `mapstructure:"sample_trace_wait_time"`
 	SampleIgnoreThreshold   uint64 `mapstructure:"sample_trace_ignore_threshold"`
+	SampleSlowThreshold     uint64 `mapstructure:"sample_trace_slow_threshold_ms"`
 	SilentPeriod            int64  `mapstructure:"silent_period"`
 	SilentCount             int    `mapstructure:"silent_count"`
 	SilentMode              string `mapstructure:"silent_mode"` // window / wait
