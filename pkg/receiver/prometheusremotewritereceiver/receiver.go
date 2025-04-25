@@ -17,6 +17,7 @@ package prometheusremotewritereceiver
 import (
 	"context"
 	"fmt"
+
 	"github.com/CloudDetail/apo-otel-collector/pkg/receiver/prometheusremotewritereceiver/internal/metadata"
 
 	"go.opentelemetry.io/collector/component"
@@ -94,8 +95,7 @@ func (receiver *prometheusRemoteWriteReceiver) startServer(ctx context.Context) 
 	prometheusRemoteWriteServer := receiver.server
 	if prometheusRemoteWriteServer == nil {
 		receiver.settings.TelemetrySettings.ReportStatus(component.NewFatalErrorEvent(fmt.Errorf("start called on null prometheusRemoteWriteServer for receiver %s", metadata.Type)))
-	}
-	if err := prometheusRemoteWriteServer.listenAndServe(ctx); err != nil {
+	} else if err := prometheusRemoteWriteServer.listenAndServe(ctx); err != nil {
 		// our receiver swallows http's ErrServeClosed, and we should only get "concerning" issues at this point in the code.
 		receiver.settings.TelemetrySettings.ReportStatus(component.NewFatalErrorEvent(err))
 		receiver.reporter.OnDebugf("Error in %s/%s listening on %s/%s: %s", metadata.Type, receiver.settings.ID, prometheusRemoteWriteServer.Addr, prometheusRemoteWriteServer.Path, err)

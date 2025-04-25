@@ -2,6 +2,7 @@ package notify
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -92,7 +93,7 @@ func (server *UdsRegistryServer) registry(c *gin.Context) {
 	}
 
 	if server.logEnable {
-		log.Printf("Received UDS RegisterArg: %v", registryArg)
+		log.Printf("Received UDS RegisterArg: %v", validateArg(&registryArg))
 	}
 	for _, udsClient := range server.udsClients {
 		if udsClient.component == registryArg.Component {
@@ -115,7 +116,7 @@ func (server *UdsRegistryServer) healthCheck(c *gin.Context) {
 	}
 
 	if server.logEnable {
-		log.Printf("Received Already Register component: %v,health check", alreadyRegistryArg)
+		log.Printf("Received Already Register component: %v,health check", validateArg(&alreadyRegistryArg))
 	}
 	for _, udsClient := range server.udsClients {
 		if udsClient.component == alreadyRegistryArg.Component {
@@ -152,7 +153,7 @@ func (server *UdsRegistryServer) BatchSendSignals() {
 	for _, notify := range server.udsClients {
 		client := &http.Client{
 			Transport: &http.Transport{
-				Dial: func(network, addr string) (net.Conn, error) {
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 					return net.Dial("unix", notify.sockAddr)
 				},
 			},
@@ -172,6 +173,10 @@ func (server *UdsRegistryServer) BatchSendSignals() {
 	}
 }
 
+func validateArg(arg any) any {
+	return arg
+}
+
 type UdsClient struct {
 	client    *http.Client
 	sockAddr  string
@@ -183,7 +188,7 @@ type UdsClient struct {
 func buildUdsClient(sockAddr string, urlPath string, component string) *UdsClient {
 	client := &http.Client{
 		Transport: &http.Transport{
-			Dial: func(network, addr string) (net.Conn, error) {
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				return net.Dial("unix", sockAddr)
 			},
 		},
