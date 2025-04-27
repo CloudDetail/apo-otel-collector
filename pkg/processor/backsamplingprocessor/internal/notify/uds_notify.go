@@ -93,7 +93,7 @@ func (server *UdsRegistryServer) registry(c *gin.Context) {
 	}
 
 	if server.logEnable {
-		log.Printf("Received UDS RegisterArg: %v", validateArg(&registryArg))
+		log.Print("Received UDS RegisterArg")
 	}
 	for _, udsClient := range server.udsClients {
 		if udsClient.component == registryArg.Component {
@@ -116,7 +116,7 @@ func (server *UdsRegistryServer) healthCheck(c *gin.Context) {
 	}
 
 	if server.logEnable {
-		log.Printf("Received Already Register component: %v,health check", validateArg(&alreadyRegistryArg))
+		log.Print("Receive health check")
 	}
 	for _, udsClient := range server.udsClients {
 		if udsClient.component == alreadyRegistryArg.Component {
@@ -171,10 +171,6 @@ func (server *UdsRegistryServer) BatchSendSignals() {
 			}
 		}
 	}
-}
-
-func validateArg(arg any) any {
-	return arg
 }
 
 type UdsClient struct {
