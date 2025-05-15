@@ -3,7 +3,7 @@ module github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor
 go 1.21.0
 
 require (
-	github.com/CloudDetail/metadata v0.0.0-20241129101557-10d59745e7b7
+	github.com/CloudDetail/metadata v0.0.0-20250515060824-116425e4caed
 	github.com/stretchr/testify v1.9.0
 	go.opentelemetry.io/collector/component v0.106.1
 	go.opentelemetry.io/collector/consumer v0.106.1
