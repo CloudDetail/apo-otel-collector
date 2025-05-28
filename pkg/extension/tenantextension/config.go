@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package tenantauth // import "github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
+package tenantauth // import "github.com/CloudDetail/apo-otel-collector/pkg/extension/tenantextension"
 
 import (
 	"errors"

@@ -8,7 +8,7 @@ import (
 
 var (
 	Type      = component.MustNewType("bearertokenauth")
-	ScopeName = "github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
+	ScopeName = "github.com/CloudDetail/apo-otel-collector/pkg/extension/tenantextension"
 )
 
 const (

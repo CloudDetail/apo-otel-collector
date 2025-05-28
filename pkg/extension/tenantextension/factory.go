@@ -6,7 +6,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/extension"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension/internal/metadata"
+	"github.com/CloudDetail/apo-otel-collector/pkg/extension/tenantextension/internal/metadata"
 )
 
 const (
