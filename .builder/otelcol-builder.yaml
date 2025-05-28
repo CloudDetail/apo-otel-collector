@@ -36,6 +36,7 @@ connectors:
 extensions:
 - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.106.1
 - gomod: github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension v0.0.0
+- gomod: github.com/CloudDetail/apo-otel-collector/pkg/extension/tenantextension v0.0.0
 
 replaces:
 - github.com/CloudDetail/apo-otel-collector/pkg/common => ../pkg/common
@@ -49,3 +50,4 @@ replaces:
 - github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver => ../pkg/receiver/skywalkingreceiver
 - github.com/CloudDetail/apo-otel-collector/pkg/receiver/prometheusremotewritereceiver => ../pkg/receiver/prometheusremotewritereceiver
 - github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter => ../pkg/exporter/clickhouseexporter # add multi tenant support
+- github.com/CloudDetail/apo-otel-collector/pkg/extension/tenantextension => ../pkg/extension/tenantextension # add multi tenant support
