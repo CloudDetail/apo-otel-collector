@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2" // For register database driver.
@@ -20,8 +21,9 @@ import (
 )
 
 type tracesExporter struct {
-	client    *sql.DB
-	insertSQL string
+	client *sql.DB
+	// insertSQL string
+	insertSQL sync.Map
 
 	logger *zap.Logger
 	cfg    *Config
@@ -34,10 +36,11 @@ func newTracesExporter(logger *zap.Logger, cfg *Config) (*tracesExporter, error)
 	}
 
 	return &tracesExporter{
-		client:    client,
-		insertSQL: renderInsertTracesSQL(cfg),
-		logger:    logger,
-		cfg:       cfg,
+		client: client,
+		// seenTenant: map[string]struct{}{},
+		// insertSQL: map[string]string{},
+		logger: logger,
+		cfg:    cfg,
 	}, nil
 }
 
@@ -53,6 +56,30 @@ func (e *tracesExporter) start(ctx context.Context, _ component.Host) error {
 	return createTracesTable(ctx, e.cfg, e.client)
 }
 
+func (e *tracesExporter) initDatabaseIfNotExist(ctx context.Context) (string, error) {
+	tenantDB := e.cfg.tenantDB(ctx)
+	if v, find := e.insertSQL.Load(tenantDB); find {
+		return v.(string), nil
+	}
+
+	query := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s %s", tenantDB, e.cfg.clusterString())
+	_, err := e.client.ExecContext(ctx, query)
+	if err != nil {
+		return "", fmt.Errorf("create database: %w", err)
+	}
+
+	err = createTracesTable(ctx, e.cfg, e.client)
+
+	if err != nil {
+		return "", fmt.Errorf("create tracestable: %w", err)
+	}
+
+	insertSQL := renderInsertTracesSQL(ctx, e.cfg)
+	e.insertSQL.Store(tenantDB, insertSQL)
+
+	return insertSQL, nil
+}
+
 // shutdown will shut down the exporter.
 func (e *tracesExporter) shutdown(_ context.Context) error {
 	if e.client != nil {
@@ -62,9 +89,14 @@ func (e *tracesExporter) shutdown(_ context.Context) error {
 }
 
 func (e *tracesExporter) pushTraceData(ctx context.Context, td ptrace.Traces) error {
+	insertSQL, err := e.initDatabaseIfNotExist(ctx)
+	if err != nil {
+		return err
+	}
+
 	start := time.Now()
-	err := doWithTx(ctx, e.client, func(tx *sql.Tx) error {
-		statement, err := tx.PrepareContext(ctx, e.insertSQL)
+	err = doWithTx(ctx, e.client, func(tx *sql.Tx) error {
+		statement, err := tx.PrepareContext(ctx, insertSQL)
 		if err != nil {
 			return fmt.Errorf("PrepareContext:%w", err)
 		}
@@ -278,33 +310,33 @@ GROUP BY TraceId;
 )
 
 func createTracesTable(ctx context.Context, cfg *Config, db *sql.DB) error {
-	if _, err := db.ExecContext(ctx, renderCreateTracesTableSQL(cfg)); err != nil {
+	if _, err := db.ExecContext(ctx, renderCreateTracesTableSQL(ctx, cfg)); err != nil {
 		return fmt.Errorf("exec create traces table sql: %w", err)
 	}
-	if _, err := db.ExecContext(ctx, renderCreateTraceIDTsTableSQL(cfg)); err != nil {
+	if _, err := db.ExecContext(ctx, renderCreateTraceIDTsTableSQL(ctx, cfg)); err != nil {
 		return fmt.Errorf("exec create traceIDTs table sql: %w", err)
 	}
-	if _, err := db.ExecContext(ctx, renderTraceIDTsMaterializedViewSQL(cfg)); err != nil {
+	if _, err := db.ExecContext(ctx, renderTraceIDTsMaterializedViewSQL(ctx, cfg)); err != nil {
 		return fmt.Errorf("exec create traceIDTs view sql: %w", err)
 	}
 	return nil
 }
 
-func renderInsertTracesSQL(cfg *Config) string {
-	return fmt.Sprintf(strings.ReplaceAll(insertTracesSQLTemplate, "'", "`"), cfg.TracesTableName)
+func renderInsertTracesSQL(ctx context.Context, cfg *Config) string {
+	return fmt.Sprintf(strings.ReplaceAll(insertTracesSQLTemplate, "'", "`"), cfg.GetTracesTableName(ctx))
 }
 
-func renderCreateTracesTableSQL(cfg *Config) string {
+func renderCreateTracesTableSQL(ctx context.Context, cfg *Config) string {
 	ttlExpr := generateTTLExpr(cfg.TTL, "toDateTime(Timestamp)")
-	return fmt.Sprintf(createTracesTableSQL, cfg.TracesTableName, cfg.clusterString(), cfg.tableEngineString(), ttlExpr)
+	return fmt.Sprintf(createTracesTableSQL, cfg.GetTracesTableName(ctx), cfg.clusterString(), cfg.tableEngineString(), ttlExpr)
 }
 
-func renderCreateTraceIDTsTableSQL(cfg *Config) string {
+func renderCreateTraceIDTsTableSQL(ctx context.Context, cfg *Config) string {
 	ttlExpr := generateTTLExpr(cfg.TTL, "toDateTime(Start)")
-	return fmt.Sprintf(createTraceIDTsTableSQL, cfg.TracesTableName, cfg.clusterString(), cfg.tableEngineString(), ttlExpr)
+	return fmt.Sprintf(createTraceIDTsTableSQL, cfg.GetTracesTableName(ctx), cfg.clusterString(), cfg.tableEngineString(), ttlExpr)
 }
 
-func renderTraceIDTsMaterializedViewSQL(cfg *Config) string {
-	return fmt.Sprintf(createTraceIDTsMaterializedViewSQL, cfg.TracesTableName,
+func renderTraceIDTsMaterializedViewSQL(ctx context.Context, cfg *Config) string {
+	return fmt.Sprintf(createTraceIDTsMaterializedViewSQL, cfg.GetTracesTableName(ctx),
 		cfg.clusterString(), cfg.Database, cfg.TracesTableName, cfg.Database, cfg.TracesTableName)
 }

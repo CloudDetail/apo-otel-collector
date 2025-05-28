@@ -50,6 +50,9 @@ type Config struct {
 	// Ignored if async inserts are configured in the `endpoint` or `connection_params`.
 	// Async inserts may still be overridden server-side.
 	AsyncInsert bool `mapstructure:"async_insert"`
+
+	TenantDBPattern string            `mapstructure:"tenant_db_pattern"`
+	TenantDBMap     map[string]string `mapstructure:"tenant_db_map"`
 }
 
 // TableEngine defines the ENGINE string value when creating the table.

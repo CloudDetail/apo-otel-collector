@@ -23,6 +23,8 @@ type logsExporter struct {
 	client    *sql.DB
 	insertSQL string
 
+	seenTenant map[string]struct{}
+
 	logger *zap.Logger
 	cfg    *Config
 }
@@ -34,10 +36,11 @@ func newLogsExporter(logger *zap.Logger, cfg *Config) (*logsExporter, error) {
 	}
 
 	return &logsExporter{
-		client:    client,
-		insertSQL: renderInsertLogsSQL(cfg),
-		logger:    logger,
-		cfg:       cfg,
+		client:     client,
+		seenTenant: map[string]struct{}{},
+		insertSQL:  renderInsertLogsSQL(cfg),
+		logger:     logger,
+		cfg:        cfg,
 	}, nil
 }
 
@@ -53,6 +56,22 @@ func (e *logsExporter) start(ctx context.Context, _ component.Host) error {
 	return createLogsTable(ctx, e.cfg, e.client)
 }
 
+func (e *logsExporter) initDatabaseIfNotExist(ctx context.Context) error {
+	tenantDB := e.cfg.tenantDB(ctx)
+
+	if _, find := e.seenTenant[tenantDB]; find {
+		return nil
+	}
+
+	query := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s %s", tenantDB, e.cfg.clusterString())
+	_, err := e.client.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("create database: %w", err)
+	}
+
+	return createLogsTable(ctx, e.cfg, e.client)
+}
+
 // shutdown will shut down the exporter.
 func (e *logsExporter) shutdown(_ context.Context) error {
 	if e.client != nil {
@@ -62,6 +81,10 @@ func (e *logsExporter) shutdown(_ context.Context) error {
 }
 
 func (e *logsExporter) pushLogsData(ctx context.Context, ld plog.Logs) error {
+	if err := e.initDatabaseIfNotExist(ctx); err != nil {
+		return err
+	}
+
 	start := time.Now()
 	err := doWithTx(ctx, e.client, func(tx *sql.Tx) error {
 		statement, err := tx.PrepareContext(ctx, e.insertSQL)
@@ -234,15 +257,15 @@ func createDatabase(ctx context.Context, cfg *Config) error {
 }
 
 func createLogsTable(ctx context.Context, cfg *Config, db *sql.DB) error {
-	if _, err := db.ExecContext(ctx, renderCreateLogsTableSQL(cfg)); err != nil {
+	if _, err := db.ExecContext(ctx, renderCreateLogsTableSQL(ctx, cfg)); err != nil {
 		return fmt.Errorf("exec create logs table sql: %w", err)
 	}
 	return nil
 }
 
-func renderCreateLogsTableSQL(cfg *Config) string {
+func renderCreateLogsTableSQL(ctx context.Context, cfg *Config) string {
 	ttlExpr := generateTTLExpr(cfg.TTL, "TimestampTime")
-	return fmt.Sprintf(createLogsTableSQL, cfg.LogsTableName, cfg.clusterString(), cfg.tableEngineString(), ttlExpr)
+	return fmt.Sprintf(createLogsTableSQL, cfg.GetLogsTableName(ctx), cfg.clusterString(), cfg.tableEngineString(), ttlExpr)
 }
 
 func renderInsertLogsSQL(cfg *Config) string {
