@@ -29,6 +29,7 @@ type Config struct {
 	// Obtain the public key from a JWKs URI
 	JWKsURI string `mapstructure:"jwks_uri,omitempty"`
 
+	PublicKey string `mapstructure:"public_key,omitempty"`
 	// TODO Obtain the public key from an environment variable
 	PublicKeyEnv string `mapstructure:"public_key_env,omitempty"`
 	// TODO Obtain the public key from a file
@@ -45,7 +46,7 @@ var (
 
 // Validate checks if the extension configuration is valid
 func (cfg *Config) Validate() error {
-	if len(cfg.JWKsURI) == 0 && len(cfg.PublicKeyEnv) == 0 && len(cfg.PublicKeyFile) == 0 {
+	if len(cfg.JWKsURI) == 0 && len(cfg.PublicKey) == 0 && len(cfg.PublicKeyEnv) == 0 && len(cfg.PublicKeyFile) == 0 {
 		return errNoPublicKeyProvided
 	}
 	return nil

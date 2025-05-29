@@ -3,8 +3,10 @@ package tenantauth
 import (
 	"context"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"math/big"
@@ -34,6 +36,8 @@ type BearerTokenAuth struct {
 
 	shutdownCH chan struct{}
 
+	commonKey *rsa.PublicKey
+
 	jwksMap map[string]key
 	mux     sync.RWMutex
 
@@ -53,6 +57,24 @@ func newBearerTokenAuth(cfg *Config, logger *zap.Logger) *BearerTokenAuth {
 		// TODO read public key from env
 	case len(cfg.PublicKeyFile) > 0:
 		// TODO read public key from file
+	case len(cfg.PublicKey) > 0:
+		decoded, err := base64.StdEncoding.DecodeString(cfg.PublicKey)
+		if err != nil {
+			logger.Fatal("failed to decode public key", zap.Error(err))
+		}
+		block, _ := pem.Decode(decoded)
+		if block == nil || block.Type != "PUBLIC KEY" {
+			logger.Fatal("failed to decode public key", zap.Error(err))
+		}
+		pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			logger.Fatal("failed to decode public key", zap.Error(err))
+		}
+		var ok bool
+		a.commonKey, ok = pubKey.(*rsa.PublicKey)
+		if !ok {
+			logger.Fatal("pubKey is not RSA public key", zap.Error(err))
+		}
 	case len(cfg.JWKsURI) > 0:
 		a.refreshPublicKey() // Load tokens from file
 	}
@@ -195,8 +217,13 @@ func (b *BearerTokenAuth) Authenticate(ctx context.Context, headers map[string][
 		if token.Method.Alg() != jwt.SigningMethodRS256.Alg() {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		if v, find := b.jwksMap[token.Header["kid"].(string)]; find {
-			return v.publicKey, nil
+		if b.jwksMap != nil {
+			if v, find := b.jwksMap[token.Header["kid"].(string)]; find {
+				return v.publicKey, nil
+			}
+		}
+		if b.commonKey != nil {
+			return b.commonKey, nil
 		}
 		return nil, errors.New("no public key")
 	}, jwt.WithValidMethods([]string{"RS256"}))
