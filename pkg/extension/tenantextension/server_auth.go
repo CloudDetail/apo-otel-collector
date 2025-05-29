@@ -11,22 +11,25 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
+	"go.opentelemetry.io/collector/client"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/extension"
 	"go.opentelemetry.io/collector/extension/extensionauth"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/metadata"
 )
 
 var (
 	_ extension.Extension      = (*BearerTokenAuth)(nil)
 	_ extensionauth.Server     = (*BearerTokenAuth)(nil)
 	_ extensionauth.HTTPClient = (*BearerTokenAuth)(nil)
-	// _ extensionauth.GRPCClient = (*BearerTokenAuth)(nil)
+	_ extensionauth.GRPCClient = (*BearerTokenAuth)(nil)
 )
 
 // BearerTokenAuth is an implementation of extensionauth interfaces. It embeds a static authorization "bearer" token in every rpc call.
@@ -233,17 +236,29 @@ func (b *BearerTokenAuth) Authenticate(ctx context.Context, headers map[string][
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			md = metadata.New(nil)
+		} else {
+			md = md.Copy()
+		}
+
 		if tenant, ok := claims["tenant"].(map[string]any); ok {
 			if tenantID, ok := tenant["tenant_id"].(string); ok {
-				ctx = context.WithValue(ctx, "tenant_id", tenantID)
+				md.Set("tenant_id", tenantID)
 			}
 			if tenantName, ok := tenant["tenant_name"].(string); ok {
-				ctx = context.WithValue(ctx, "tenant_name", tenantName)
+				md.Set("tenant_name", tenantName)
 			}
-			if account_id, ok := tenant["account_id"].(string); ok {
-				ctx = context.WithValue(ctx, "account_id", account_id)
+			if account_id, ok := tenant["account_id"].(float64); ok {
+				md.Set("account_id", strconv.FormatInt(int64(account_id), 10))
 			}
 		}
+
+		ctx = client.NewContext(ctx, client.Info{
+			Addr:     nil,
+			Metadata: client.NewMetadata(md),
+		})
 	}
 	return ctx, nil
 }

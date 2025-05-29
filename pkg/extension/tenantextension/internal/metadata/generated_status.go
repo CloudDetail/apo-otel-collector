@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	Type      = component.MustNewType("bearertokenauth")
+	Type      = component.MustNewType("tenantextension")
 	ScopeName = "github.com/CloudDetail/apo-otel-collector/pkg/extension/tenantextension"
 )
 

@@ -42,6 +42,9 @@ func createDefaultConfig() component.Config {
 		TTL:              0,
 		CreateSchema:     true,
 		AsyncInsert:      true,
+		TenantDBMap: map[string]string{
+			"__SYSTEM__": "apo",
+		},
 	}
 }
 

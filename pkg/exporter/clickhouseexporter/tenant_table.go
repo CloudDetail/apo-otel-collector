@@ -4,21 +4,23 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"go.opentelemetry.io/collector/client"
 )
 
 const DEFAULT_TENANT_DATABASE_PATTERN = `apo_tenant_{TENANT_ID}`
 
 func (cfg *Config) tenantDB(ctx context.Context) string {
-	v := ctx.Value("tenant_id")
-	if v == nil {
+	info := client.FromContext(ctx)
+	v := info.Metadata.Get("tenant_id")
+	if len(v) == 0 {
 		return cfg.Database
 	}
 
-	tenantID, ok := v.(string)
-	if !ok || len(tenantID) == 0 {
+	tenantID := v[0]
+	if len(tenantID) <= 0 {
 		return cfg.Database
 	}
-
 	if db, exist := cfg.TenantDBMap[tenantID]; exist {
 		return db
 	}

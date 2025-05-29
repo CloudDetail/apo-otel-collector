@@ -1,6 +1,11 @@
 package tenantauth
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+
+	"go.opentelemetry.io/collector/client"
+)
 
 // BearerAuthRoundTripper intercepts and adds Bearer token Authorization headers to each http request.
 type BearerAuthRoundTripper struct {
@@ -12,7 +17,7 @@ type BearerAuthRoundTripper struct {
 const (
 	// prometheusRemoteWrite
 	// https://<vminsert-addr>/insert/<tenant_id>/prometheus/api/v1/write
-	RemoteWriteEndpoint = "/insert/{TENANT_ID}/prometheus"
+	TenantIDPlaceholder = "{TENANT_ID}"
 )
 
 // RoundTrip modifies the original request and adds Bearer token Authorization headers. Incoming requests support multiple tokens, but outgoing requests only use one.
@@ -22,11 +27,16 @@ func (interceptor *BearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.R
 		req2.Header = make(http.Header)
 	}
 
-	// Do nothing
-	// // otlphttp
-	// req.URL.Path = ""
-	// // victoria metrics
-	// req.URL.Path = strings.ReplaceAll(req.URL.Path, RemoteWriteEndpoint, fmt.Sprintf("/insert/{TENANT_ID}/prometheus"))
+	info := client.FromContext(req.Context())
+	v := info.Metadata.Get("account_id")
+	if len(v) == 0 {
+		return interceptor.base.RoundTrip(req2)
+	}
+
+	accountID := v[0]
+	if len(accountID) > 0 {
+		req2.URL.Path = strings.ReplaceAll(req.URL.Path, TenantIDPlaceholder, accountID)
+	}
 
 	// req2.Header.Set(interceptor.header, interceptor.auth.authorizationValue())
 	return interceptor.base.RoundTrip(req2)

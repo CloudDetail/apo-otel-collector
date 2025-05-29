@@ -191,6 +191,8 @@ github.com/yusufpapurcu/wmi v1.2.4/go.mod h1:SBZ9tNy3G9/m5Oi98Zks0QjeHVDvuK0qfxQ
 go.mongodb.org/mongo-driver v1.11.4/go.mod h1:PTSz5yu21bkT/wXpkS7WR5f0ddqw5quethTUn9WM+2g=
 go.opentelemetry.io/collector v0.106.1 h1:ZSQMpFGzFP3RILe1/+K80kCCT2ahn3MKt5e3u0Yz7Rs=
 go.opentelemetry.io/collector v0.106.1/go.mod h1:1FabMxWLluLNcC0dq8cI01GaE6t6fYxE6Oxuf8u7AGQ=
+go.opentelemetry.io/collector/client v0.106.1 h1:aBasAp+t7F30lI+oQpT95ZgYMiNaUlYRlgyeEvEGwjk=
+go.opentelemetry.io/collector/client v0.106.1/go.mod h1:QEmOGAu/8vNn2lhwcLVI3iEUIoQlXNGWsdCfENN5qDc=
 go.opentelemetry.io/collector/component v0.106.1 h1:6Xp4tKqnd/JkJDG/C4p1hto+Y5zvk5FwqZIdMCPzZlA=
 go.opentelemetry.io/collector/component v0.106.1/go.mod h1:KiVE/5ZayuLlDJTe7mHqHRCn/5LrmF99C7/mKe54mWA=
 go.opentelemetry.io/collector/config/configopaque v1.12.0 h1:aIsp9NdcLZSiG4YDoFPGXhmma03Tk+6e89+n8GtU/Mc=
