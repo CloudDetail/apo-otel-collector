@@ -46,6 +46,16 @@ func createDefaultConfig() component.Config {
 		TenantDBMap: map[string]string{
 			"__SYSTEM__": "apo",
 		},
+		TraceStyle: "otlp",
+		JaegerCFG: JaegerTraceCfg{
+			MultiTenant:       true,
+			InitSQLScriptsDir: "",
+			InitTables:        true,
+			SpansTable:        "jaeger_spans",
+			SpansIndexTable:   "jaeger_index",
+			OperationsTable:   "jaeger_operations",
+			Encoding:          "json",
+		},
 	}
 }
 
