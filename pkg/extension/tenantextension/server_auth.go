@@ -20,16 +20,15 @@ import (
 	"go.opentelemetry.io/collector/client"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/extension"
-	"go.opentelemetry.io/collector/extension/extensionauth"
+	extensionauth "go.opentelemetry.io/collector/extension/auth"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 )
 
 var (
-	_ extension.Extension      = (*BearerTokenAuth)(nil)
-	_ extensionauth.Server     = (*BearerTokenAuth)(nil)
-	_ extensionauth.HTTPClient = (*BearerTokenAuth)(nil)
-	_ extensionauth.GRPCClient = (*BearerTokenAuth)(nil)
+	_ extension.Extension  = (*BearerTokenAuth)(nil)
+	_ extensionauth.Server = (*BearerTokenAuth)(nil)
+	_ extensionauth.Client = (*BearerTokenAuth)(nil)
 )
 
 // BearerTokenAuth is an implementation of extensionauth interfaces. It embeds a static authorization "bearer" token in every rpc call.
