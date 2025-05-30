@@ -180,7 +180,7 @@ type key struct {
 // Shutdown of BearerTokenAuth does nothing and returns nil
 func (b *BearerTokenAuth) Shutdown(_ context.Context) error {
 	if b.shutdownCH == nil {
-		return errors.New("bearerToken file monitoring is not running")
+		return nil
 	}
 	b.shutdownCH <- struct{}{}
 	close(b.shutdownCH)
