@@ -53,7 +53,12 @@ func (e *tracesExporter) start(ctx context.Context, _ component.Host) error {
 		return err
 	}
 
-	return createTracesTable(ctx, e.cfg, e.client)
+	switch e.cfg.TraceStyle {
+	case "jaeger":
+		return e.initJaegerDatabaseIfNotExist(e.logger, e.client)
+	default:
+		return createTracesTable(ctx, e.cfg, e.client)
+	}
 }
 
 func (e *tracesExporter) initDatabaseIfNotExist(ctx context.Context) (string, error) {

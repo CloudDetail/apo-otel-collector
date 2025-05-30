@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter/jaeger"
 	"go.opentelemetry.io/collector/config/configopaque"
 	"go.opentelemetry.io/collector/config/configretry"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
@@ -53,6 +54,24 @@ type Config struct {
 
 	TenantDBPattern string            `mapstructure:"tenant_db_pattern"`
 	TenantDBMap     map[string]string `mapstructure:"tenant_db_map"`
+
+	// jaeger or otlp
+	TraceStyle string         `mapstructure:"trace_style"`
+	JaegerCFG  JaegerTraceCfg `mapstructure:"jaeger_trace_table"`
+}
+
+type JaegerTraceCfg struct {
+	MultiTenant       bool   `mapstructure:"multi_tenant"`
+	InitSQLScriptsDir string `mapstructure:"init_sql_scripts_dir"`
+	InitTables        bool   `mapstructure:"init_tables"`
+
+	SpansTable jaeger.TableName `mapstructure:"spans_table"`
+	// Span index table. Default "jaeger_index_local" or "jaeger_index" when replication is enabled.
+	SpansIndexTable jaeger.TableName `mapstructure:"spans_index_table"`
+	// Operations table. Default "jaeger_operations_local" or "jaeger_operations" when replication is enabled.
+	OperationsTable jaeger.TableName `mapstructure:"operations_table"`
+
+	Encoding string `mapstructure:"encoding"`
 }
 
 // TableEngine defines the ENGINE string value when creating the table.

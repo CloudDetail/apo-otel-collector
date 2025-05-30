@@ -10,14 +10,17 @@ import (
 
 const DEFAULT_TENANT_DATABASE_PATTERN = `apo_tenant_{TENANT_ID}`
 
-func (cfg *Config) tenantDB(ctx context.Context) string {
+func (cfg *Config) tenant(ctx context.Context) string {
 	info := client.FromContext(ctx)
 	v := info.Metadata.Get("tenant_id")
 	if len(v) == 0 {
-		return cfg.Database
+		return ""
 	}
+	return v[0]
+}
 
-	tenantID := v[0]
+func (cfg *Config) tenantDB(ctx context.Context) string {
+	tenantID := cfg.tenant(ctx)
 	if len(tenantID) <= 0 {
 		return cfg.Database
 	}

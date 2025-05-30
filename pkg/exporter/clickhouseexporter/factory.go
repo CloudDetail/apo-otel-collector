@@ -12,6 +12,7 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configretry"
+	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 
@@ -87,11 +88,19 @@ func createTracesExporter(
 		return nil, fmt.Errorf("cannot configure clickhouse traces exporter: %w", err)
 	}
 
+	var pusher consumer.ConsumeTracesFunc
+	switch c.TraceStyle {
+	case "jaeger":
+		pusher = exporter.pushJaegerTraceData
+	default:
+		pusher = exporter.pushTraceData
+	}
+
 	return exporterhelper.NewTracesExporter(
 		ctx,
 		set,
 		cfg,
-		exporter.pushTraceData,
+		pusher,
 		exporterhelper.WithStart(exporter.start),
 		exporterhelper.WithShutdown(exporter.shutdown),
 		exporterhelper.WithTimeout(c.TimeoutSettings),
