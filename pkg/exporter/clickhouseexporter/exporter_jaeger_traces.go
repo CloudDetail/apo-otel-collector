@@ -27,6 +27,12 @@ func (e *tracesExporter) initJaegerDatabaseIfNotExist(logger *zap.Logger, db *sq
 		ttlDate       string
 	)
 
+	query := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s %s", e.cfg.Database, e.cfg.clusterString())
+	_, err := e.client.ExecContext(context.Background(), query)
+	if err != nil {
+		return err
+	}
+
 	if e.cfg.TTL > 0 {
 		day := e.cfg.TTL % (24 * time.Hour)
 		if day <= 0 {

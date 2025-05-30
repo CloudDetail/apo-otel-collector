@@ -16,7 +16,7 @@ type BearerAuthRoundTripper struct {
 
 const (
 	// prometheusRemoteWrite
-	// https://<vminsert-addr>/insert/<tenant_id>/prometheus/api/v1/write
+	// https://<vminsert-addr>/insert/{TENANT_ID}/prometheus/api/v1/write
 	TenantIDPlaceholder = "{TENANT_ID}"
 )
 
