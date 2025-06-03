@@ -233,6 +233,9 @@ func (e *tracesExporter) writeIndexBatch(db *sql.DB, tenant string, batches []*m
 			if span == nil {
 				continue
 			}
+			if span.Process == nil {
+				span.Process = &model.Process{}
+			}
 			keys, values := uniqueTagsForSpan(span)
 			if tenant == "" {
 				_, err = statement.Exec(
