@@ -37,8 +37,6 @@ func newTracesExporter(logger *zap.Logger, cfg *Config) (*tracesExporter, error)
 
 	return &tracesExporter{
 		client: client,
-		// seenTenant: map[string]struct{}{},
-		// insertSQL: map[string]string{},
 		logger: logger,
 		cfg:    cfg,
 	}, nil
