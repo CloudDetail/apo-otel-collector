@@ -230,6 +230,9 @@ func (e *tracesExporter) writeIndexBatch(db *sql.DB, tenant string, batches []*m
 
 	for _, batch := range batches {
 		for _, span := range batch.Spans {
+			if span == nil {
+				continue
+			}
 			keys, values := uniqueTagsForSpan(span)
 			if tenant == "" {
 				_, err = statement.Exec(
@@ -264,16 +267,23 @@ func (e *tracesExporter) writeIndexBatch(db *sql.DB, tenant string, batches []*m
 }
 
 func uniqueTagsForSpan(span *model.Span) (keys, values []string) {
-	uniqueTags := make(map[string][]string, len(span.Tags)+len(span.Process.Tags))
+	processLength := 0
+	if span.Process != nil {
+		processLength += len(span.Process.Tags)
+	}
+
+	uniqueTags := make(map[string][]string, len(span.Tags)+processLength)
 
 	for i := range span.Tags {
 		key := tagKey(&span.GetTags()[i])
 		uniqueTags[key] = append(uniqueTags[key], tagValue(&span.GetTags()[i]))
 	}
 
-	for i := range span.Process.Tags {
-		key := tagKey(&span.GetProcess().GetTags()[i])
-		uniqueTags[key] = append(uniqueTags[key], tagValue(&span.GetProcess().GetTags()[i]))
+	if span.Process != nil {
+		for i := range span.Process.Tags {
+			key := tagKey(&span.GetProcess().GetTags()[i])
+			uniqueTags[key] = append(uniqueTags[key], tagValue(&span.GetProcess().GetTags()[i]))
+		}
 	}
 
 	for _, event := range span.Logs {
