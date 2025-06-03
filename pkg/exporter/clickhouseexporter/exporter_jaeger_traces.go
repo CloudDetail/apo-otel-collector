@@ -166,8 +166,10 @@ func (e *tracesExporter) writeModelBatch(db *sql.DB, tenant string, batches []*m
 
 	for _, batch := range batches {
 		for _, span := range batch.Spans {
+			if span.Process == nil {
+				span.Process = batch.Process
+			}
 			var serialized []byte
-
 			if e.cfg.JaegerCFG.Encoding == jaeger.JSONEncoding {
 				serialized, err = json.Marshal(span)
 			} else {
@@ -234,7 +236,7 @@ func (e *tracesExporter) writeIndexBatch(db *sql.DB, tenant string, batches []*m
 				continue
 			}
 			if span.Process == nil {
-				span.Process = &model.Process{}
+				span.Process = batch.Process
 			}
 			keys, values := uniqueTagsForSpan(span)
 			if tenant == "" {
