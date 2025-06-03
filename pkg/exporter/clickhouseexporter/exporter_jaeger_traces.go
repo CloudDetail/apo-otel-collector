@@ -79,9 +79,9 @@ func (e *tracesExporter) initJaegerDatabaseIfNotExist(logger *zap.Logger, db *sq
 			args.OperationsTable = args.OperationsTable.ToLocal()
 			args.SpansArchiveTable = args.SpansArchiveTable.ToLocal()
 
-			cfg.SpansIndexTable = cfg.SpansIndexTable.ToLocal()
-			cfg.SpansTable = cfg.SpansTable.ToLocal()
-			cfg.OperationsTable = cfg.OperationsTable.ToLocal()
+			e.cfg.JaegerCFG.SpansIndexTable = cfg.SpansIndexTable.ToLocal()
+			e.cfg.JaegerCFG.SpansTable = cfg.SpansTable.ToLocal()
+			e.cfg.JaegerCFG.OperationsTable = cfg.OperationsTable.ToLocal()
 		}
 
 		sqlStatements = append(sqlStatements, jaeger.Render(templates, "jaeger-index.tmpl.sql", args))
