@@ -3,6 +3,7 @@ module github.com/CloudDetail/apo-otel-collector/pkg/extension/tenantextension
 go 1.21.0
 
 require (
+	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	go.opentelemetry.io/collector/client v0.106.1
 	go.opentelemetry.io/collector/component v0.106.1

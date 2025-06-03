@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/golang-jwt/jwt/v4"
 	"go.opentelemetry.io/collector/client"
 	"go.opentelemetry.io/collector/component"
@@ -42,6 +43,8 @@ type BearerTokenAuth struct {
 
 	jwksMap map[string]key
 	mux     sync.RWMutex
+
+	jwtCache sync.Map
 
 	cfg    *Config
 	logger *zap.Logger
@@ -206,32 +209,9 @@ func (b *BearerTokenAuth) Authenticate(ctx context.Context, headers map[string][
 		return ctx, fmt.Errorf("missing or empty authorization header: %s", b.header)
 	}
 
-	parts := strings.SplitN(auth[0], " ", 2)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		return ctx, errors.New("invalid authorization header format")
-	}
-
-	tokenStr := parts[1]
-
-	b.mux.RLock()
-	defer b.mux.RUnlock()
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-		if token.Method.Alg() != jwt.SigningMethodRS256.Alg() {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		if b.jwksMap != nil {
-			if v, find := b.jwksMap[token.Header["kid"].(string)]; find {
-				return v.publicKey, nil
-			}
-		}
-		if b.commonKey != nil {
-			return b.commonKey, nil
-		}
-		return nil, errors.New("no public key")
-	}, jwt.WithValidMethods([]string{"RS256"}))
-
-	if err != nil || !token.Valid {
-		return ctx, fmt.Errorf("invalid JWT: %w", err)
+	token, err := b.getUserInfoFromJWT(auth[0])
+	if err != nil {
+		return ctx, err
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
@@ -283,4 +263,45 @@ func decodePublicKey(nB64, eB64 string) (*rsa.PublicKey, error) {
 		E: eInt,
 	}
 	return pubKey, nil
+}
+
+func (b *BearerTokenAuth) getUserInfoFromJWT(tokenStr string) (*jwt.Token, error) {
+	hash := xxhash.Sum64String(tokenStr)
+	if val, ok := b.jwtCache.Load(hash); ok {
+		if info, ok := val.(*jwt.Token); ok {
+			// TODO check expired
+			return info, nil
+		}
+	}
+
+	parts := strings.SplitN(tokenStr, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return nil, errors.New("invalid authorization header format")
+	}
+
+	userInfo := parts[1]
+
+	b.mux.RLock()
+	defer b.mux.RUnlock()
+	token, err := jwt.Parse(userInfo, func(token *jwt.Token) (interface{}, error) {
+		if token.Method.Alg() != jwt.SigningMethodRS256.Alg() {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		if b.jwksMap != nil {
+			if v, find := b.jwksMap[token.Header["kid"].(string)]; find {
+				return v.publicKey, nil
+			}
+		}
+		if b.commonKey != nil {
+			return b.commonKey, nil
+		}
+		return nil, errors.New("no public key")
+	}, jwt.WithValidMethods([]string{"RS256"}))
+
+	if err != nil || !token.Valid {
+		return nil, fmt.Errorf("invalid JWT: %w", err)
+	}
+
+	b.jwtCache.Store(hash, token)
+	return token, nil
 }
