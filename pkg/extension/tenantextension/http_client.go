@@ -17,7 +17,7 @@ type BearerAuthRoundTripper struct {
 const (
 	// prometheusRemoteWrite
 	// https://<vminsert-addr>/insert/{TENANT_ID}/prometheus/api/v1/write
-	TenantIDPlaceholder = "{TENANT_ID}"
+	AccountIDPlaceholder = ":accountID"
 )
 
 // RoundTrip modifies the original request and adds Bearer token Authorization headers. Incoming requests support multiple tokens, but outgoing requests only use one.
@@ -35,7 +35,7 @@ func (interceptor *BearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.R
 
 	accountID := v[0]
 	if len(accountID) > 0 {
-		req2.URL.Path = strings.ReplaceAll(req.URL.Path, TenantIDPlaceholder, accountID)
+		req2.URL.Path = strings.ReplaceAll(req.URL.Path, AccountIDPlaceholder, accountID)
 	}
 
 	// req2.Header.Set(interceptor.header, interceptor.auth.authorizationValue())
