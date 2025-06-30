@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY_HOST: registry.cn-hangzhou.aliyuncs.com
-  CONTAINER_NAME: otel-collector
+  CONTAINER_NAME: apo-otel-collector
   DEPLOYMENT_NAME: apo-otel-collector-gateway
   NAMESPACE: apo
 
