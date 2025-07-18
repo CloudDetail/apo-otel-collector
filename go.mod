@@ -60,7 +60,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
 	github.com/ClickHouse/ch-go v0.61.5 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.27.1 // indirect
-	github.com/CloudDetail/apo-module/model v0.0.0-20250117023909-15f015544de7 // indirect
+	github.com/CloudDetail/apo-module/model v0.0.0-20250625022830-f240d8d2ffb5 // indirect
 	github.com/CloudDetail/apo-otel-collector/pkg/common v0.0.0-00000000000000-000000000000 // indirect
 	github.com/CloudDetail/apo-otel-collector/pkg/fillproc v0.0.0-00000000000000-000000000000 // indirect
 	github.com/CloudDetail/apo-otel-collector/pkg/sqlprune v0.0.0-00000000000000-000000000000 // indirect

@@ -3,7 +3,7 @@ module github.com/CloudDetail/apo-otel-collector/pkg/processor/backsamplingproce
 go 1.21.0
 
 require (
-	github.com/CloudDetail/apo-module/model v0.0.0-20250117023909-15f015544de7
+	github.com/CloudDetail/apo-module/model v0.0.0-20250625022830-f240d8d2ffb5
 	github.com/CloudDetail/apo-otel-collector/pkg/fillproc v0.0.0-00000000000000-000000000000
 	github.com/gin-gonic/gin v1.10.0
 	github.com/stretchr/testify v1.9.0

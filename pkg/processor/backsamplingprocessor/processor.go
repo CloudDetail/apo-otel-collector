@@ -232,6 +232,7 @@ func (bsp *backSamplingProcessor) ConsumeTraces(ctx context.Context, traces ptra
 			}
 			swTraceId := getSkywalkingTraceId(resource)
 			idToSpans := groupSpansByTraceId(rss)
+			clusterID := getClusterID(resource)
 			for traceId, spans := range idToSpans {
 				bsp.telemetry.ProcessorBackSamplingSpanCount.Add(bsp.ctx, int64(len(spans)), measureSampleReceived)
 				// Adaptive PreSample
@@ -242,7 +243,7 @@ func (bsp *backSamplingProcessor) ConsumeTraces(ctx context.Context, traces ptra
 				}
 				reportType := adaptiveResult.GetReportType()
 				for _, span := range spans {
-					bsp.buildSpanTrace(pid, containerId, serviceName, span, reportType, bsp.adaptiveSampler.GetSampleValue())
+					bsp.buildSpanTrace(pid, containerId, serviceName, span, reportType, bsp.adaptiveSampler.GetSampleValue(), clusterID)
 				}
 
 				if adaptiveResult.IsSingleStore() {
@@ -264,13 +265,14 @@ func (bsp *backSamplingProcessor) ConsumeTraces(ctx context.Context, traces ptra
 				continue
 			}
 			ilsSlice := rspans.ScopeSpans()
+			clusterID := getClusterID(resource)
 			for j := 0; j < ilsSlice.Len(); j++ {
 				ils := ilsSlice.At(j)
 				spans := ils.Spans()
 				bsp.telemetry.ProcessorBackSamplingSpanCount.Add(bsp.ctx, int64(spans.Len()), measureSampleReceived)
 				for k := 0; k < spans.Len(); k++ {
 					span := spans.At(k)
-					bsp.buildSpanTrace(pid, containerId, serviceName, &span, 0, 0)
+					bsp.buildSpanTrace(pid, containerId, serviceName, &span, 0, 0, clusterID)
 				}
 			}
 		}
@@ -278,7 +280,7 @@ func (bsp *backSamplingProcessor) ConsumeTraces(ctx context.Context, traces ptra
 	}
 }
 
-func (bsp *backSamplingProcessor) buildSpanTrace(pid uint32, containerId string, serviceName string, span *ptrace.Span, reportType uint32, sampleValue int64) {
+func (bsp *backSamplingProcessor) buildSpanTrace(pid uint32, containerId string, serviceName string, span *ptrace.Span, reportType uint32, sampleValue int64, clusterID string) {
 	startTime := span.StartTimestamp()
 	endTime := span.EndTimestamp()
 	if endTime <= startTime {
@@ -318,6 +320,7 @@ func (bsp *backSamplingProcessor) buildSpanTrace(pid uint32, containerId string,
 			EndTime:     uint64(span.EndTimestamp()),
 			NodeName:    bsp.nodeName,
 			NodeIp:      bsp.nodeIp,
+			ClusterID:   clusterID,
 		}
 
 		if reportType == 0 {
@@ -549,6 +552,14 @@ func getSkywalkingTraceId(resource pcommon.Resource) string {
 	resourceAttr := resource.Attributes()
 	if swTraceIdAttr, ok := resourceAttr.Get("sw8.trace_id"); ok {
 		return swTraceIdAttr.Str()
+	}
+	return ""
+}
+
+func getClusterID(resource pcommon.Resource) string {
+	resourceAttr := resource.Attributes()
+	if clusterIDAttr, ok := resourceAttr.Get("cluster_id"); ok {
+		return clusterIDAttr.Str()
 	}
 	return ""
 }
