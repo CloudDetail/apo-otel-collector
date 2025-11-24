@@ -139,7 +139,6 @@ func (p *traceBlockProcessor) runMinuteTask() {
 	for {
 		select {
 		case <-p.minuteTicker.C:
-			p.logger.Info("Check And Reprot Stat")
 			p.cleanExpired()
 			p.reportStats()
 		case <-p.stopCh:
