@@ -7,6 +7,7 @@ import (
 	fillprocextension "github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension"
 	backsamplingprocessor "github.com/CloudDetail/apo-otel-collector/pkg/processor/backsamplingprocessor"
 	metadataprocessor "github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor"
+	traceblockprocessor "github.com/CloudDetail/apo-otel-collector/pkg/processor/traceblockprocessor"
 	otlpreceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver"
 	prometheusremotewritereceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/prometheusremotewritereceiver"
 	skywalkingreceiver "github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver"
@@ -76,6 +77,7 @@ func components() (otelcol.Factories, error) {
 		batchprocessor.NewFactory(),
 		memorylimiterprocessor.NewFactory(),
 		backsamplingprocessor.NewFactory(),
+		traceblockprocessor.NewFactory(),
 		metadataprocessor.NewFactory(),
 		k8sattributesprocessor.NewFactory(),
 		resourceprocessor.NewFactory(),

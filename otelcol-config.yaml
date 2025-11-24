@@ -46,6 +46,10 @@ connectors:
     # httpMethod / topUrl
     http_parser: topUrl
 processors:
+  traceblock:
+    idle_ttl: 5m
+    block_threshold: 30m
+    blocked_idle_ttl: 10m
   batch:
     send_batch_size: 10000
     timeout: 2s
@@ -107,11 +111,11 @@ service:
   pipelines:
     traces/red:
       receivers: [otlp, skywalking]
-      processors: [batch]
+      processors: [traceblock, batch]
       exporters: [redmetrics]
     traces:
       receivers: [otlp, skywalking]
-      processors: [backsampling, batch]
+      processors: [traceblock, backsampling, batch]
       exporters: [otlp]
     metrics:
       receivers: [otlp, redmetrics]

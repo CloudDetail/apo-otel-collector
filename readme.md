@@ -12,6 +12,7 @@
 - [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/memorylimiterprocessor)
 - [metadataprocessor](./pkg/processor/metadataprocessor)
 - [backsamplingprocessor](./pkg/processor/backsamplingprocessor)
+- [traceblockprocessor](./pkg/processor/traceblockprocessor)
 
 ### Connectors
 - [redmetricsconnector](./pkg/connector/redmetricsconnector)
@@ -181,3 +182,39 @@ service:
       receivers: [prometheus/own_metrics]
       exporters: [otlphttp/victoriametrics]
 ```
+
+## TraceBlockProcessor
+Drops span data from traces that have been continuously generating spans for an extended period. This processor:
+
+1. **Caches the start time and latest update time for each TraceId**: When a TraceId is first encountered, it records the first seen time (firstSeen) and latest update time (lastSeen).
+2. **Periodically cleans expired TraceIds**: Executes a cleanup task every minute (default) to remove TraceId records that have not received new spans within the specified time period (default 5 minutes).
+3. **Automatically blocks long-running traces**: When a TraceId has been cached for longer than the specified duration (default 1 hour), all subsequent span data for that TraceId will be directly dropped, but the latest time will continue to be updated. The cleanup duration for blocked TraceIds is increased to 2x (default 2 * 5 minutes = 10 minutes).
+
+This processor effectively prevents abnormally long-running traces from consuming excessive resources, and is particularly suitable for handling abnormal traces that continuously generate spans but cannot properly terminate.
+
+```yaml
+processors:
+  traceblock:
+    # Maximum time to retain a Trace when no new spans are received, default 5 minutes
+    idle_ttl: 5m
+    # Duration after which a trace in cache is considered abnormal and subsequent spans are dropped, default 1 hour
+    block_threshold: 30m
+    # Maximum time to retain a Trace for blocked traces, must greater than idle_ttl.
+    blocked_idle_ttl: 10m
+service:
+  pipelines:
+    traces:
+      receivers: [otlp, skywalking]
+      processors: [traceblock, backsampling, batch]
+      exporters: [otlp]
+```
+
+### Parameter Tuning Recommendations
+
+- **clean_interval**: The default 1 minute is reasonable for most scenarios. You can adjust it based on your cleanup frequency requirements. Shorter intervals provide more timely cleanup but consume more CPU.
+
+- **idle_ttl**: The default 5 minutes is suitable for normal traces. If your application has traces that may have longer gaps between spans (but are still normal), you may need to increase this value. However, be aware that longer TTLs will increase memory usage.
+
+- **block_threshold**: The default 1 hour is designed to catch truly abnormal traces. If your environment has many legitimate long-running traces (e.g., batch jobs, data processing pipelines), you may need to increase this value. Conversely, if you want to block abnormal traces more aggressively, you can decrease it (e.g., 30 minutes). Note: `block_threshold` must be greater than `idle_ttl`.
+
+- **blocked_idle_multiplier**: The default value of 2 means blocked traces will be cleaned after 2 * idle_ttl (10 minutes by default). This gives blocked traces a longer cleanup window to ensure they are truly inactive before removal. Generally, there's no need to adjust this unless you have specific requirements.

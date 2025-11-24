@@ -11,6 +11,7 @@ require (
 	github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextension v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/processor/backsamplingprocessor v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor v0.0.0
+	github.com/CloudDetail/apo-otel-collector/pkg/processor/traceblockprocessor v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/receiver/prometheusremotewritereceiver v0.0.0
 	github.com/CloudDetail/apo-otel-collector/pkg/receiver/skywalkingreceiver v0.0.0
@@ -320,6 +321,8 @@ replace github.com/CloudDetail/apo-otel-collector/pkg/extension/fillprocextensio
 replace github.com/CloudDetail/apo-otel-collector/pkg/processor/backsamplingprocessor => ./pkg/processor/backsamplingprocessor
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/processor/metadataprocessor => ./pkg/processor/metadataprocessor
+
+replace github.com/CloudDetail/apo-otel-collector/pkg/processor/traceblockprocessor => ./pkg/processor/traceblockprocessor
 
 replace github.com/CloudDetail/apo-otel-collector/pkg/receiver/otlpreceiver => ./pkg/receiver/otlpreceiver
 
