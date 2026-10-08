@@ -1,0 +1,43 @@
+# 独立的 Kafka → VictoriaMetrics 指标网关配置；不会启用节点元数据补全。
+# 必填环境变量和认证配置见 docs/kafka-metrics.md。
+receivers:
+  kafka/ebpf:
+    brokers: ["${env:KAFKA_BROKER}"]
+    protocol_version: "${env:KAFKA_PROTOCOL_VERSION}"
+    topic: "${env:KAFKA_METRICS_TOPIC}"
+    group_id: "${env:KAFKA_CONSUMER_GROUP}"
+    client_id: apo-otel-collector-ebpf
+    # v0.106.1 的 metrics receiver 只支持 OTLP protobuf。
+    encoding: otlp_proto
+    # 仅影响没有已提交 offset 的消费组；已有消费组会从已提交位置继续。
+    initial_offset: earliest
+    autocommit:
+      enable: true
+      interval: 1s
+    message_marking:
+      after: true
+      on_error: false
+
+exporters:
+  prometheusremotewrite/ebpf:
+    endpoint: "${env:VM_REMOTE_WRITE_URL}"
+    # 保留 camera-agent 指标名称及 vmrange/le 桶标签。
+    add_metric_suffixes: false
+    resource_to_telemetry_conversion:
+      enabled: true
+    # 同步写入，让消费成功标记发生在下游写入成功之后。
+    remote_write_queue:
+      enabled: false
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+
+service:
+  pipelines:
+    metrics/kafka:
+      receivers: [kafka/ebpf]
+      # 不使用异步 batch，避免仅入内存缓冲就标记 Kafka 消息成功。
+      processors: []
+      exporters: [prometheusremotewrite/ebpf]

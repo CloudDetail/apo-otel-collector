@@ -2,6 +2,7 @@
 
 ## Components
 ### Receivers
+- [kafkareceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.106.1/receiver/kafkareceiver) — [Kafka eBPF 指标接入说明](./docs/kafka-metrics.md)
 - [otlpreceiver](./pkg/receiver/otlpreceiver)
 - [skywalkingreceiver](./pkg/receiver/skywalkingreceiver)
 - [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)

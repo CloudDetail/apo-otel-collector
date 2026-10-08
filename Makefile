@@ -8,7 +8,7 @@ check_builder_exist:
 	@if command -v builder >/dev/null 2>&1; then \
 		echo "using builder to generate otelcol code"; \
 	else \
-		echo "builder is not installed. Installed it with: go install go.opentelemetry.io/collector/cmd/builder@v0.103.1"; \
+		echo "builder is not installed. Installed it with: go install go.opentelemetry.io/collector/cmd/builder@v0.106.1"; \
 		exit 1; \
 	fi
 
